@@ -1,8 +1,7 @@
 import * as THREE from 'three';
-import { SceneBuilder } from '$lib/sceneCreator';
-import { getOrbitControls } from '$lib/utils';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { SceneBuilder } from '$lib/sceneBuilder';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { WaterJet } from '$lib/waterJet';
 
 function addLights(scene: THREE.Scene) {
 	// 1. Ambient Light - Soft base color (slightly warm)
@@ -42,8 +41,7 @@ function addBox(scene: THREE.Scene): THREE.Mesh {
 	return mesh;
 }
 
-function addHose(scene: THREE.Scene): THREE.Mesh {
-	const hosePos = new THREE.Vector3(0, 3, 10);
+function addHose(scene: THREE.Scene, hosePos: THREE.Vector3): THREE.Mesh {
 	const hoseGeometry = new THREE.CylinderGeometry(0.1, 0.2, 2, 16);
 	const hoseMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
 	const hose = new THREE.Mesh(hoseGeometry, hoseMaterial);
@@ -99,8 +97,9 @@ function addHornet(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
 		(gltf) => {
 			const model = gltf.scene;
 
-			model.scale.set(0.006, 0.006, 0.006);
+			model.scale.set(0.003, 0.003, 0.003);
 			model.position.set(0, 0, 0);
+			model.rotation.y = Math.PI;
 
 			scene.add(model);
 
@@ -136,38 +135,51 @@ function addHornet(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
 	);
 }
 
+function addGround2(scene: THREE.Scene) {
+	const mesh = new THREE.Mesh(
+		new THREE.PlaneGeometry(100, 100),
+		new THREE.MeshPhongMaterial({ color: 0xffffff, depthWrite: false })
+	);
+	mesh.rotation.x = -Math.PI / 2;
+	mesh.receiveShadow = true;
+	scene.add(mesh);
+}
+
 export class HoseSceneBuilder extends SceneBuilder {
 	box!: THREE.Mesh;
-	controls!: OrbitControls;
 	animationFrame: number = 0;
-	timer = new THREE.Timer();
+	waterJet!: WaterJet;
 
 	constructor(container: HTMLElement) {
 		super(container);
 
+		const hosePos = new THREE.Vector3(0, 3, 10);
+
 		addLights(this.scene);
-		addHose(this.scene);
+		//addHose(this.scene, hosePos);
 
 		addHornet(this.scene, this.renderer);
 		addGround(this.scene);
-		this.controls = getOrbitControls(this.camera, this.renderer.domElement);
+
+		this.waterJet = new WaterJet(this.scene, hosePos);
 	}
 
 	setupCamera() {
 		super.setupCamera();
-		this.camera.position.z = 9;
+		this.camera.position.z = 8;
 		this.camera.position.y = 15;
+		this.camera.lookAt(new THREE.Vector3(0, 0, 0));
 	}
 
 	animate() {
-		this.controls.update(); // required for damping
+		this.waterJet.preRender();
 		this.renderer.render(this.scene, this.camera);
+		this.waterJet.postRender();
 		this.animationFrame = requestAnimationFrame(() => this.animate());
 	}
 
 	cleanup() {
 		super.cleanup();
 		cancelAnimationFrame(this.animationFrame);
-		this.controls.dispose();
 	}
 }
