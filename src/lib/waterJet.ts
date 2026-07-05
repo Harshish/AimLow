@@ -16,9 +16,12 @@ export class WaterJet {
 	halfY: number = window.innerHeight / 2;
 	scene: THREE.Scene;
 	acc: number = 0;
-	geometry?: THREE.BufferGeometry;
-	material?: THREE.PointsMaterial;
-	points?: THREE.Points;
+	geometry!: THREE.BufferGeometry;
+	material!: THREE.PointsMaterial;
+	points!: THREE.Points;
+	positions!: Float32Array;
+	maxParticles: number = 10000;
+	gacc!: THREE.Vector3;
 	constructor(scene: THREE.Scene, startPos: THREE.Vector3) {
 		this.scene = scene;
 		this.startPos = startPos;
@@ -27,6 +30,25 @@ export class WaterJet {
 		window.addEventListener('pointermove', this.onPointerMove);
 		this.onWindowResize = this.onWindowResize.bind(this);
 		window.addEventListener('resize', this.onWindowResize);
+
+		this.gacc = this.gravity.clone().multiplyScalar(0.016);
+		// Water Droplet
+		this.geometry = new THREE.BufferGeometry();
+		const material = new THREE.PointsMaterial({
+			color: 0x66ccff,
+			size: 0.09,
+			transparent: true,
+			opacity: 0.6,
+			depthWrite: false,
+			blending: THREE.AdditiveBlending
+		});
+
+		this.points = new THREE.Points(this.geometry, material);
+		this.scene.add(this.points);
+
+		// Water Jet
+		this.positions = new Float32Array(this.maxParticles * 3);
+		this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
 	}
 
 	private spawnWater() {
@@ -36,11 +58,22 @@ export class WaterJet {
 			-2
 		).normalize();
 
+		const velocity = dir.multiplyScalar(15);
+
+		// tiny turbulence
+		velocity.x += (Math.random() - 0.5) * 0.2;
+		velocity.y += (Math.random() - 0.5) * 0.2;
+		velocity.z += (Math.random() - 0.5) * 0.1;
+
 		this.particles.push({
 			position: this.startPos.clone(),
-			velocity: dir.multiplyScalar(6),
+			velocity: velocity,
 			life: 2
 		});
+
+		if (this.particles.length >= this.maxParticles) {
+			this.particles.shift(); // remove oldest
+		}
 	}
 
 	private onPointerMove(e: PointerEvent) {
@@ -54,20 +87,25 @@ export class WaterJet {
 	}
 
 	private update() {
-		// emit continuously
-		this.acc += 0.02;
+		const EMIT_RATE = 300; // hose strength
+		const dt = 0.016;
 
-		while (this.acc > 0.02) {
+		this.acc += dt * EMIT_RATE;
+
+		while (this.acc >= 1) {
 			this.spawnWater();
-			this.acc -= 0.02;
+			this.acc -= 1;
 		}
 
 		// update particles
 		for (let i = this.particles.length - 1; i >= 0; i--) {
 			const p = this.particles[i];
 
-			p.velocity.add(this.gravity.clone().multiplyScalar(0.016));
+			p.velocity.add(this.gacc);
 			p.position.add(p.velocity.clone().multiplyScalar(0.016));
+
+			//drag
+			p.velocity.multiplyScalar(0.99);
 
 			p.life -= 0.016;
 
@@ -85,33 +123,17 @@ export class WaterJet {
 		}
 	}
 
-	preRender() {
+	render() {
 		this.update();
 
 		// render particles as simple points (cheap + fast)
-		this.geometry = new THREE.BufferGeometry();
-		const positions: number[] = [];
-
+		let i3 = 0;
 		for (const p of this.particles) {
-			positions.push(p.position.x, p.position.y, p.position.z);
+			this.positions[i3++] = p.position.x;
+			this.positions[i3++] = p.position.y;
+			this.positions[i3++] = p.position.z;
 		}
-
-		this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-
-		const material = new THREE.PointsMaterial({
-			color: 0x4dabf7,
-			size: 0.08,
-			transparent: true,
-			opacity: 0.8
-		});
-
-		this.points = new THREE.Points(this.geometry, material);
-		this.scene.add(this.points);
-	}
-
-	postRender() {
-		if (this.points) this.scene.remove(this.points);
-		if (this.geometry) this.geometry.dispose();
-		if (this.material) this.material.dispose();
+		this.geometry.setDrawRange(0, this.particles.length);
+		this.geometry.attributes.position.needsUpdate = true;
 	}
 }

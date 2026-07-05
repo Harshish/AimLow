@@ -29,7 +29,7 @@ function addLights(scene: THREE.Scene) {
 
 	// Optional: Point light for extra glow
 	const pointLight = new THREE.PointLight(0xffffff, 1.0, 100);
-	pointLight.position.set(0, 8, 5);
+	pointLight.position.set(0, 8, 10);
 	scene.add(pointLight);
 }
 
@@ -41,48 +41,48 @@ function addBox(scene: THREE.Scene): THREE.Mesh {
 	return mesh;
 }
 
-function addHose(scene: THREE.Scene, hosePos: THREE.Vector3): THREE.Mesh {
-	const hoseGeometry = new THREE.CylinderGeometry(0.1, 0.2, 2, 16);
-	const hoseMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
-	const hose = new THREE.Mesh(hoseGeometry, hoseMaterial);
-
-	hose.position.copy(hosePos);
-	hose.rotation.x = Math.PI / 2;
-	scene.add(hose);
-	return hose;
-}
-
 function addGround(scene: THREE.Scene) {
 	const mesh = new THREE.Mesh(
-		new THREE.PlaneGeometry(100, 100),
-		new THREE.MeshPhongMaterial({ color: 0xffffff, depthWrite: false })
+		new THREE.CircleGeometry(30, 32),
+		new THREE.MeshPhongMaterial({
+			color: 0x222222,
+			emissive: 0x072534,
+			side: THREE.DoubleSide,
+			flatShading: true
+		})
 	);
+	mesh.position.set(0, 0, 0);
 	mesh.rotation.x = -Math.PI / 2;
 	mesh.receiveShadow = true;
 	scene.add(mesh);
 }
 
-function addFly(scene: THREE.Scene) {
+function addUrinalModel(scene: THREE.Scene) {
 	const loader = new GLTFLoader();
 
 	loader.load(
-		'/models/hornet.glb',
+		'/models/urinal.glb',
 		(gltf) => {
 			const model = gltf.scene;
-			model.scale.set(1, 1, 1);
-			model.position.set(0, 0, 0);
 
-			model.traverse((child) => {
-				if (child instanceof THREE.Mesh) {
-					child.castShadow = true;
-					child.receiveShadow = true; // ← also important
-				}
-			});
+			model.scale.set(12, 12, 12);
+			model.position.set(0, -4, 2);
+			model.rotation.y = 2 * Math.PI;
 
 			scene.add(model);
+
+			model.traverse((child) => {
+				if ((child as THREE.Mesh).isMesh) {
+					child.castShadow = true;
+					child.receiveShadow = true;
+				}
+			});
+		},
+		(progress) => {
+			console.log('Urinal GLB loading progress:', progress);
 		},
 		(error) => {
-			console.error('Error loading model:', error);
+			console.error('Urinal GLB load failed:', error);
 		}
 	);
 }
@@ -135,18 +135,7 @@ function addHornet(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
 	);
 }
 
-function addGround2(scene: THREE.Scene) {
-	const mesh = new THREE.Mesh(
-		new THREE.PlaneGeometry(100, 100),
-		new THREE.MeshPhongMaterial({ color: 0xffffff, depthWrite: false })
-	);
-	mesh.rotation.x = -Math.PI / 2;
-	mesh.receiveShadow = true;
-	scene.add(mesh);
-}
-
 export class HoseSceneBuilder extends SceneBuilder {
-	box!: THREE.Mesh;
 	animationFrame: number = 0;
 	waterJet!: WaterJet;
 
@@ -156,25 +145,25 @@ export class HoseSceneBuilder extends SceneBuilder {
 		const hosePos = new THREE.Vector3(0, 3, 10);
 
 		addLights(this.scene);
-		//addHose(this.scene, hosePos);
 
-		addHornet(this.scene, this.renderer);
+		//addHornet(this.scene, this.renderer);
+		//addBox(this.scene);
 		addGround(this.scene);
+		addUrinalModel(this.scene);
 
 		this.waterJet = new WaterJet(this.scene, hosePos);
 	}
 
 	setupCamera() {
 		super.setupCamera();
-		this.camera.position.z = 8;
-		this.camera.position.y = 15;
+		this.camera.position.z = 10;
+		this.camera.position.y = 10;
 		this.camera.lookAt(new THREE.Vector3(0, 0, 0));
 	}
 
 	animate() {
-		this.waterJet.preRender();
+		this.waterJet.render();
 		this.renderer.render(this.scene, this.camera);
-		this.waterJet.postRender();
 		this.animationFrame = requestAnimationFrame(() => this.animate());
 	}
 
