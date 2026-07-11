@@ -24,7 +24,7 @@ export default class Preloader {
 			}
 
 			if (this.progress === 1) {
-				this.loading.classList.add('fade');
+				this.loading.style.opacity = '0';
 				window.setTimeout(() => this.ready(), 1200);
 			}
 		});

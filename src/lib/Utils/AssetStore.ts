@@ -16,8 +16,8 @@ type AssetStore = {
 
 const assetsToLoad: Asset[] = [
 	{
-		path: '/models/fly.glb',
-		id: 'fly',
+		path: '/models/urinal.glb',
+		id: 'urinal',
 		type: 'model'
 	}
 ];
