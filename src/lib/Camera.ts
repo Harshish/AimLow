@@ -28,8 +28,8 @@ export default class Camera {
 			200
 		);
 
-		this.instance.position.z = 60;
-		this.instance.position.y = 20;
+		this.instance.position.z = 100;
+		this.instance.position.y = 60;
 	}
 
 	setResizeListner() {

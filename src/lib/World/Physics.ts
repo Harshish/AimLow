@@ -17,6 +17,7 @@ export default class Physics {
 	constructor() {
 		this.app = new App();
 		this.scene = this.app.scene;
+		this.meshMap = new Map();
 
 		import('@dimforge/rapier3d-compat').then(async (module) => {
 			const RAPIER = module.default;
@@ -24,9 +25,8 @@ export default class Physics {
 			const gravity = { x: 0, y: -9.81, z: 0 };
 			this.world = new RAPIER.World(gravity);
 			this.rapier = RAPIER;
-			this.meshMap = new Map();
 
-			const groundGeometry = new THREE.BoxGeometry(10, 1, 10);
+			const groundGeometry = new THREE.BoxGeometry(50, 1, 50);
 			const groundMaterial = new THREE.MeshStandardMaterial({ color: 'red' });
 			this.groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
 			this.scene.add(this.groundMesh);
@@ -34,7 +34,7 @@ export default class Physics {
 			const groundRigidBodyType = RAPIER.RigidBodyDesc.fixed();
 			this.groundRigidBody = this.world.createRigidBody(groundRigidBodyType);
 
-			const groundColliderType = RAPIER.ColliderDesc.cuboid(5, 0.5, 5);
+			const groundColliderType = RAPIER.ColliderDesc.cuboid(25, 0.5, 25);
 			this.world.createCollider(groundColliderType, this.groundRigidBody);
 
 			this.rapierLoaded = true;
@@ -46,8 +46,12 @@ export default class Physics {
 		// Create Physics Wolrld Object
 		const rigidBodyType = this.rapier.RigidBodyDesc.dynamic();
 		this.rigidBody = this.world.createRigidBody(rigidBodyType);
-		this.rigidBody.setTranslation(mesh.position, false);
-		this.rigidBody.setRotation(mesh.quaternion, false);
+
+		const worldPosition = mesh.getWorldPosition(new THREE.Vector3());
+		const worldRotation = mesh.getWorldQuaternion(new THREE.Quaternion());
+
+		this.rigidBody.setTranslation(worldPosition, false);
+		this.rigidBody.setRotation(worldRotation, false);
 
 		const diemensions = this.computeCuboidDimensions(mesh);
 
@@ -85,8 +89,23 @@ export default class Physics {
 		this.world.step();
 
 		this.meshMap.forEach((rigidBody, mesh) => {
-			const position = rigidBody.translation();
-			const rotation = rigidBody.rotation();
+			const position = new THREE.Vector3().copy(rigidBody.translation());
+			const rotation = new THREE.Quaternion().copy(rigidBody.rotation());
+
+			if (mesh.parent) {
+				//for position
+				mesh.parent.worldToLocal(position);
+
+				//for rotation
+				const inverseParentMatrix = new THREE.Matrix4()
+					.extractRotation(mesh.parent.matrixWorld)
+					.invert();
+				const inverseParentRotation = new THREE.Quaternion().setFromRotationMatrix(
+					inverseParentMatrix
+				);
+
+				rotation.premultiply(inverseParentRotation);
+			}
 
 			mesh.position.copy(position);
 			mesh.quaternion.copy(rotation);

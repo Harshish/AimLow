@@ -9,3 +9,7 @@ export const sizesStore = writable({
 export const appStateStore = writable({
 	physicsReady: false
 });
+
+export const appStatusStore = writable({
+	started: false
+});

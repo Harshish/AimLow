@@ -1,4 +1,6 @@
 import { assetStore } from '../Utils/AssetStore';
+import { appStatusStore } from '../Utils/Store';
+import { get } from 'svelte/store';
 
 export default class Preloader {
 	overlay!: HTMLElement;
@@ -43,6 +45,7 @@ export default class Preloader {
 			() => {
 				this.overlay.style.opacity = '0';
 				this.startButton.style.opacity = '0';
+				appStatusStore.set({ started: true });
 
 				// remove the overlay  and startButton elelemnt from DOM
 				window.setTimeout(() => {

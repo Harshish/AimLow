@@ -10,6 +10,7 @@ export default class Environment {
 	directionalLight!: THREE.DirectionalLight;
 	physics!: Physics;
 	cubeMesh!: THREE.Mesh;
+	cubeMesh2!: THREE.Mesh;
 	constructor() {
 		this.app = new App();
 		this.scene = this.app?.scene;
@@ -37,11 +38,27 @@ export default class Environment {
 		const material = new THREE.MeshStandardMaterial({ color: 'orange' });
 		this.cubeMesh = new THREE.Mesh(geometry, material);
 
-		this.cubeMesh.position.set(1, 40, 1);
-		this.cubeMesh.castShadow = true;
-		this.cubeMesh.rotation.set(0, 0, Math.PI / 4);
-		this.scene.add(this.cubeMesh);
+		this.cubeMesh.position.set(0, 10, 0);
+		this.cubeMesh.rotation.set(1, 0, 1);
+		//this.scene.add(this.cubeMesh);
+
+		//mesh 2
+
+		const material2 = new THREE.MeshStandardMaterial({ color: 'green' });
+		this.cubeMesh2 = new THREE.Mesh(geometry, material2);
+
+		this.cubeMesh2.position.set(0, 15, 0);
+		this.cubeMesh2.rotation.set(2, 0, 2);
+		this.cubeMesh2.scale.set(2, 2, 2);
+		//this.scene.add(this.cubeMesh2);
+
+		const group = new THREE.Group();
+		group.add(this.cubeMesh, this.cubeMesh2);
+		group.position.set(0, 10, 0);
+		group.rotation.x = 0.5;
+		this.scene.add(group);
 
 		this.physics.add(this.cubeMesh);
+		this.physics.add(this.cubeMesh2);
 	}
 }
