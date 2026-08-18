@@ -5,3 +5,7 @@ export const sizesStore = writable({
 	height: 0,
 	pixelRatio: 1
 });
+
+export const appStateStore = writable({
+	physicsReady: false
+});
