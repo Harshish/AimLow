@@ -4,12 +4,14 @@ import Physics from './Physics';
 import Environment from './Environment';
 import { appStateStore } from '$lib/Utils/Store';
 import { appStatusStore } from '../Utils/Store';
+import Character from './Character';
 
 export default class World {
 	app: App;
 	scene: THREE.Scene;
 	physics: Physics;
 	environment!: Environment;
+	character!: Character;
 	appStarted: boolean = false;
 	constructor() {
 		console.log('World Init');
@@ -21,6 +23,7 @@ export default class World {
 		appStateStore.subscribe((state) => {
 			if (state.physicsReady) {
 				this.environment = new Environment();
+				this.character = new Character();
 			}
 		});
 
@@ -34,5 +37,6 @@ export default class World {
 	loop() {
 		if (!this.appStarted) return;
 		this.physics.loop();
+		if (this.character) this.character.loop();
 	}
 }

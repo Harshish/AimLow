@@ -13,3 +13,10 @@ export const appStateStore = writable({
 export const appStatusStore = writable({
 	started: false
 });
+
+export const inputStore = writable({
+	forward: false,
+	backward: false,
+	left: false,
+	right: false
+});
