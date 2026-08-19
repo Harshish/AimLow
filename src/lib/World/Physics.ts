@@ -3,6 +3,9 @@ import App from '../App';
 import RAPIER_TYPE from '@dimforge/rapier3d-compat';
 import { appStateStore } from '$lib/Utils/Store';
 
+type RigidBodyType = 'fixed' | 'dynamic';
+type ColliderType = 'cuboid' | 'ball' | 'trimesh';
+
 export default class Physics {
 	app: App;
 	scene: THREE.Scene;
@@ -10,7 +13,6 @@ export default class Physics {
 	cubeMesh!: THREE.Mesh;
 	rigidBody!: RAPIER_TYPE.RigidBody;
 	rapierLoaded = false;
-	groundMesh!: THREE.Mesh;
 	groundRigidBody!: RAPIER_TYPE.RigidBody;
 	rapier!: typeof RAPIER_TYPE;
 	meshMap!: Map<THREE.Mesh, RAPIER_TYPE.RigidBody>;
@@ -25,45 +27,51 @@ export default class Physics {
 			const gravity = { x: 0, y: -9.81, z: 0 };
 			this.world = new RAPIER.World(gravity);
 			this.rapier = RAPIER;
-
-			const groundGeometry = new THREE.BoxGeometry(50, 1, 50);
-			const groundMaterial = new THREE.MeshStandardMaterial({ color: 'red' });
-			this.groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
-			this.scene.add(this.groundMesh);
-
-			const groundRigidBodyType = RAPIER.RigidBodyDesc.fixed();
-			this.groundRigidBody = this.world.createRigidBody(groundRigidBodyType);
-
-			const groundColliderType = RAPIER.ColliderDesc.cuboid(25, 0.5, 25);
-			this.world.createCollider(groundColliderType, this.groundRigidBody);
-
 			this.rapierLoaded = true;
 			appStateStore.set({ physicsReady: true });
 		});
 	}
 
-	add(mesh: THREE.Mesh) {
+	add(mesh: THREE.Mesh, type: RigidBodyType, collider: ColliderType) {
+		let rigidBodyType: RAPIER_TYPE.RigidBodyDesc;
+		if (type === 'fixed') {
+			rigidBodyType = this.rapier.RigidBodyDesc.fixed();
+		} else {
+			rigidBodyType = this.rapier.RigidBodyDesc.dynamic();
+		}
+
 		// Create Physics Wolrld Object
-		const rigidBodyType = this.rapier.RigidBodyDesc.dynamic();
 		this.rigidBody = this.world.createRigidBody(rigidBodyType);
+
+		// Define Collider Type
+		let colliderType;
+		switch (collider) {
+			case 'cuboid':
+				const diemensions = this.computeCuboidDimensions(mesh);
+				colliderType = this.rapier.ColliderDesc.cuboid(
+					diemensions.x / 2,
+					diemensions.y / 2,
+					diemensions.z / 2
+				);
+				break;
+			case 'ball':
+				const radius = this.computeBallDimensions(mesh);
+				colliderType = this.rapier.ColliderDesc.ball(radius);
+				break;
+			case 'trimesh':
+				const { scaledVertices, indices } = this.computeTrimeshDimensions(mesh);
+				colliderType = this.rapier.ColliderDesc.trimesh(scaledVertices, indices);
+
+				break;
+		}
+
+		this.world.createCollider(colliderType, this.rigidBody);
 
 		const worldPosition = mesh.getWorldPosition(new THREE.Vector3());
 		const worldRotation = mesh.getWorldQuaternion(new THREE.Quaternion());
 
 		this.rigidBody.setTranslation(worldPosition, false);
 		this.rigidBody.setRotation(worldRotation, false);
-
-		const diemensions = this.computeCuboidDimensions(mesh);
-
-		// The dimension passed here needs to be dynamic and the way we will get it is not direct.
-		// We will create a compute function which will calculate the dimensions for us dynamically.
-		const colliderType = this.rapier.ColliderDesc.cuboid(
-			diemensions.x / 2,
-			diemensions.y / 2,
-			diemensions.z / 2
-		);
-		this.world.createCollider(colliderType, this.rigidBody);
-
 		this.meshMap.set(mesh, this.rigidBody);
 	}
 
@@ -73,13 +81,55 @@ export default class Physics {
 	// It would be more convenient if it directly returned the result, but it
 	// needs a Vector input. We need getWorldScale because scaling the geometry
 	// directly can cause incorrect physics behavior.
-	computeCuboidDimensions(mesh: THREE.Mesh) {
+	computeCuboidDimensions(mesh: THREE.Mesh): THREE.Vector3 {
 		mesh.geometry.computeBoundingBox();
-		if (!mesh.geometry.boundingBox) return new THREE.Vector3();
+		if (!mesh.geometry.boundingBox) throw new Error('No bounding box');
 		const size = mesh.geometry.boundingBox.getSize(new THREE.Vector3());
 		const worldScale = mesh.getWorldScale(new THREE.Vector3());
 		size.multiply(worldScale);
 		return size;
+	}
+
+	computeBallDimensions(mesh: THREE.Mesh): number {
+		mesh.geometry.computeBoundingSphere();
+		if (!mesh.geometry.boundingSphere) throw new Error('No bounding sphere');
+		const radius = mesh.geometry.boundingSphere.radius;
+		const worldScale = mesh.getWorldScale(new THREE.Vector3());
+		const maxScale = Math.max(worldScale.x, worldScale.y, worldScale.z);
+		return radius * maxScale;
+	}
+
+	computeTrimeshDimensions(mesh: THREE.Mesh): {
+		scaledVertices: Float32Array;
+		indices: Uint32Array;
+	} {
+		const position = mesh.geometry.attributes.position;
+		const index = mesh.geometry.index;
+
+		if (!index) {
+			throw new Error('No index');
+		}
+
+		const worldScale = mesh.getWorldScale(new THREE.Vector3());
+
+		const scaledVertices = new Float32Array(position.count * 3);
+
+		for (let i = 0; i < position.count; i++) {
+			scaledVertices[i * 3] = position.getX(i) * worldScale.x;
+			scaledVertices[i * 3 + 1] = position.getY(i) * worldScale.y;
+			scaledVertices[i * 3 + 2] = position.getZ(i) * worldScale.z;
+		}
+
+		const indices = new Uint32Array(index.count);
+
+		for (let i = 0; i < index.count; i++) {
+			indices[i] = index.getX(i);
+		}
+
+		return {
+			scaledVertices,
+			indices
+		};
 	}
 
 	loop() {

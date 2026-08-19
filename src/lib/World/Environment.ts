@@ -11,12 +11,14 @@ export default class Environment {
 	physics!: Physics;
 	cubeMesh!: THREE.Mesh;
 	cubeMesh2!: THREE.Mesh;
+	groundMesh!: THREE.Mesh;
 	constructor() {
 		this.app = new App();
 		this.scene = this.app?.scene;
 		this.physics = this.app?.world?.physics;
 
 		this.loadEnvironment();
+		this.addGround();
 		this.addMeshes();
 	}
 
@@ -32,33 +34,26 @@ export default class Environment {
 		this.scene.add(this.directionalLight);
 	}
 
+	addGround() {
+		const groundGeometry = new THREE.BoxGeometry(50, 1, 50);
+		const groundMaterial = new THREE.MeshStandardMaterial({ color: 'red' });
+		this.groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
+		this.scene.add(this.groundMesh);
+		this.physics.add(this.groundMesh, 'fixed', 'cuboid');
+	}
+
 	addMeshes() {
 		// Create ThreeJS Mesh
-		const geometry = new THREE.BoxGeometry(2, 2, 2);
-		const material = new THREE.MeshStandardMaterial({ color: 'orange' });
-		this.cubeMesh = new THREE.Mesh(geometry, material);
+		const geometry = new THREE.BoxGeometry(1, 1, 1);
+		const material = new THREE.MeshStandardMaterial({ color: 'blue' });
 
-		this.cubeMesh.position.set(0, 10, 0);
-		this.cubeMesh.rotation.set(1, 0, 1);
-		//this.scene.add(this.cubeMesh);
-
-		//mesh 2
-
-		const material2 = new THREE.MeshStandardMaterial({ color: 'green' });
-		this.cubeMesh2 = new THREE.Mesh(geometry, material2);
-
-		this.cubeMesh2.position.set(0, 15, 0);
-		this.cubeMesh2.rotation.set(2, 0, 2);
-		this.cubeMesh2.scale.set(2, 2, 2);
-		//this.scene.add(this.cubeMesh2);
-
-		const group = new THREE.Group();
-		group.add(this.cubeMesh, this.cubeMesh2);
-		group.position.set(0, 10, 0);
-		group.rotation.x = 0.5;
-		this.scene.add(group);
-
-		this.physics.add(this.cubeMesh);
-		this.physics.add(this.cubeMesh2);
+		for (let i = 0; i < 100; i++) {
+			const mesh = new THREE.Mesh(geometry, material);
+			mesh.position.set(Math.random() * 10, Math.random() + 50, Math.random() * 10);
+			mesh.scale.set(Math.random() + 0.5, Math.random() + 0.5, Math.random() + 0.5);
+			mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+			this.scene.add(mesh);
+			this.physics.add(mesh, 'dynamic', 'trimesh');
+		}
 	}
 }
