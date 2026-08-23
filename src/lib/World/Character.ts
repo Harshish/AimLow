@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import App from '../App.js';
+import RAPIER from '@dimforge/rapier3d-compat';
+import Physics from './Physics';
 
 import { inputStore } from '../Utils/Store.ts';
 
@@ -11,9 +13,12 @@ export default class Character {
 	backward: boolean = false;
 	left: boolean = false;
 	right: boolean = false;
+	characterRigidBody!: RAPIER.RigidBody;
+	physics: Physics;
 	constructor() {
 		this.app = new App();
 		this.scene = this.app.scene;
+		this.physics = this.app.world.physics;
 
 		inputStore.subscribe((state) => {
 			this.forward = state.forward;
@@ -31,23 +36,30 @@ export default class Character {
 		this.character = new THREE.Mesh(geometry, material);
 		this.character.position.set(0, 2.5, 0);
 		this.scene.add(this.character);
+		this.characterRigidBody = this.physics.add(this.character, 'kinematicPosition', 'cuboid');
 	}
 
 	loop() {
+		let { x, y, z } = this.characterRigidBody.translation();
+		//this.characterRigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+
 		if (this.forward) {
-			this.character.position.z -= 0.1;
+			z = z - 5;
 		}
 
 		if (this.backward) {
-			this.character.position.z += 0.1;
+			z = z + 5;
 		}
 
 		if (this.left) {
-			this.character.position.x -= 0.1;
+			x = x - 5;
 		}
 
 		if (this.right) {
-			this.character.position.x += 0.1;
+			x = x + 5;
 		}
+
+		//this.characterRigidBody.setLinvel({ x, y, z }, true);
+		this.characterRigidBody.setNextKinematicTranslation({ x, y, z });
 	}
 }

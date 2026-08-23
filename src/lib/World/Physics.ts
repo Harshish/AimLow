@@ -3,7 +3,7 @@ import App from '../App';
 import RAPIER_TYPE from '@dimforge/rapier3d-compat';
 import { appStateStore } from '$lib/Utils/Store';
 
-type RigidBodyType = 'fixed' | 'dynamic';
+type RigidBodyType = 'fixed' | 'dynamic' | 'kinematic' | 'kinematicPosition';
 type ColliderType = 'cuboid' | 'ball' | 'trimesh';
 
 export default class Physics {
@@ -34,10 +34,19 @@ export default class Physics {
 
 	add(mesh: THREE.Mesh, type: RigidBodyType, collider: ColliderType) {
 		let rigidBodyType: RAPIER_TYPE.RigidBodyDesc;
-		if (type === 'fixed') {
-			rigidBodyType = this.rapier.RigidBodyDesc.fixed();
-		} else {
-			rigidBodyType = this.rapier.RigidBodyDesc.dynamic();
+		switch (type) {
+			case 'dynamic':
+				rigidBodyType = this.rapier.RigidBodyDesc.dynamic();
+				break;
+			case 'fixed':
+				rigidBodyType = this.rapier.RigidBodyDesc.fixed();
+				break;
+			case 'kinematic':
+				rigidBodyType = this.rapier.RigidBodyDesc.kinematicVelocityBased();
+				break;
+			case 'kinematicPosition':
+				rigidBodyType = this.rapier.RigidBodyDesc.kinematicPositionBased();
+				break;
 		}
 
 		// Create Physics Wolrld Object
@@ -61,7 +70,6 @@ export default class Physics {
 			case 'trimesh':
 				const { scaledVertices, indices } = this.computeTrimeshDimensions(mesh);
 				colliderType = this.rapier.ColliderDesc.trimesh(scaledVertices, indices);
-
 				break;
 		}
 
@@ -73,6 +81,8 @@ export default class Physics {
 		this.rigidBody.setTranslation(worldPosition, false);
 		this.rigidBody.setRotation(worldRotation, false);
 		this.meshMap.set(mesh, this.rigidBody);
+
+		return this.rigidBody;
 	}
 
 	// mesh.geometry.boundingBox is initially null until you run the
