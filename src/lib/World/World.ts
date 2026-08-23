@@ -31,12 +31,12 @@ export default class World {
 			this.appStarted = state.started;
 		});
 
-		this.loop();
+		this.loop(0, 0);
 	}
 
-	loop() {
+	loop(deltaTime: number, elapsedTime: number) {
 		if (!this.appStarted) return;
 		this.physics.loop();
-		if (this.character) this.character.loop();
+		if (this.character) this.character.loop(deltaTime);
 	}
 }
