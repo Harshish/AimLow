@@ -142,10 +142,11 @@ export default class Physics {
 		};
 	}
 
-	loop() {
+	loop(deltaTime: number) {
 		// Update the ThreeJS Mesh According to Physics World Object
 		if (!this.rapierLoaded) return;
 
+		this.world.timestep = Math.min(deltaTime, 0.1);
 		this.world.step();
 
 		this.meshMap.forEach((rigidBody, mesh) => {

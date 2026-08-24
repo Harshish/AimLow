@@ -7,6 +7,7 @@ import Resize from './Utils/Resize';
 import Preloader from './UI/Preloader';
 import AssetLoader from './Utils/AssetLoader';
 import { sizesStore } from './Utils/Store';
+import { debugStore } from './Utils/Store';
 import InputController from './UI/InputController';
 
 let instance: App | null = null;
@@ -32,6 +33,9 @@ export default class App {
 			height: window.innerHeight,
 			pixelRatio: Math.min(window.devicePixelRatio, 2)
 		});
+
+		// Enable Debug
+		debugStore.set({ debug: true });
 
 		// Canvas & Scene
 		this.canvas = document.querySelector('canvas.threejs') as HTMLCanvasElement;

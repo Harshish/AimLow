@@ -20,3 +20,7 @@ export const inputStore = writable({
 	left: false,
 	right: false
 });
+
+export const debugStore = writable({
+	debug: false
+});

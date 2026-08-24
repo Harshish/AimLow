@@ -3,6 +3,8 @@ import Camera from '../Camera';
 import Renderer from '../Renderer';
 import World from '../World/World';
 import * as THREE from 'three';
+import RapierDebugger from './RapierDebugger';
+import { debugStore } from '../Utils/Store';
 
 export default class Loop {
 	app: App;
@@ -10,7 +12,7 @@ export default class Loop {
 	renderer: Renderer;
 	world: World;
 	timer: THREE.Timer;
-	previousElapsedTime: number;
+	debugger?: RapierDebugger;
 	constructor() {
 		console.log('Loop Init');
 		this.app = new App();
@@ -18,20 +20,24 @@ export default class Loop {
 		this.renderer = this.app.renderer;
 		this.world = this.app.world;
 
+		debugStore.subscribe((state) => {
+			if (state.debug) this.debugger = new RapierDebugger();
+			else if (this.debugger) this.app.scene.remove(this.debugger.mesh);
+		});
+
 		this.timer = new THREE.Timer();
-		this.previousElapsedTime = 0;
-		this.loop(0);
+		this.loop();
 	}
 
-	loop(time: number) {
+	loop() {
 		this.timer.update();
 		const elapsedTime = this.timer.getElapsed();
-		const deltaTime = elapsedTime - this.previousElapsedTime;
-		this.previousElapsedTime = elapsedTime;
+		const deltaTime = this.timer.getDelta();
 
 		this.world.loop(deltaTime, elapsedTime);
 		this.camera.loop();
 		this.renderer.loop();
-		window.requestAnimationFrame((time) => this.loop(time));
+		this.debugger?.loop();
+		window.requestAnimationFrame(() => this.loop());
 	}
 }
