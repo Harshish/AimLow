@@ -1,6 +1,5 @@
 import { assetStore } from '../Utils/AssetStore';
 import { appStatusStore } from '../Utils/Store';
-import { get } from 'svelte/store';
 
 export default class Preloader {
 	overlay!: HTMLElement;

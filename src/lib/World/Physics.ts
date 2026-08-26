@@ -85,12 +85,6 @@ export default class Physics {
 		return this.rigidBody;
 	}
 
-	// mesh.geometry.boundingBox is initially null until you run the
-	// computeBoundingBox() function. The getSize function is a bit unusual:
-	// it requires a vector as an argument and then returns the updated vector.
-	// It would be more convenient if it directly returned the result, but it
-	// needs a Vector input. We need getWorldScale because scaling the geometry
-	// directly can cause incorrect physics behavior.
 	computeCuboidDimensions(mesh: THREE.Mesh): THREE.Vector3 {
 		mesh.geometry.computeBoundingBox();
 		if (!mesh.geometry.boundingBox) throw new Error('No bounding box');

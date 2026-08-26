@@ -5,6 +5,7 @@ import Environment from './Environment';
 import { appStateStore } from '$lib/Utils/Store';
 import { appStatusStore } from '../Utils/Store';
 import Character from './Character';
+import { WaterJet } from '$lib/World/Elements/WaterJet';
 
 export default class World {
 	app: App;
@@ -13,6 +14,7 @@ export default class World {
 	environment!: Environment;
 	character!: Character;
 	appStarted: boolean = false;
+	waterJet: WaterJet;
 	constructor() {
 		console.log('World Init');
 		this.app = new App();
@@ -31,11 +33,15 @@ export default class World {
 			this.appStarted = state.started;
 		});
 
+		const hosePos = new THREE.Vector3(0, 6, 12);
+		this.waterJet = new WaterJet(hosePos);
+
 		this.loop(0, 0);
 	}
 
 	loop(deltaTime: number, elapsedTime: number) {
 		if (!this.appStarted) return;
+		this.waterJet.loop(deltaTime);
 		this.physics.loop(deltaTime);
 		if (this.character) this.character.loop(deltaTime);
 	}

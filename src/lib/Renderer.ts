@@ -27,6 +27,8 @@ export default class Renderer {
 			canvas: this.canvas,
 			antialias: true
 		});
+		this.instance.shadowMap.enabled = true;
+		this.instance.shadowMap.type = THREE.VSMShadowMap;
 		this.instance.setSize(get(sizesStore).width, get(sizesStore).height);
 		this.instance.setPixelRatio(Math.min(get(sizesStore).pixelRatio, 2));
 	}

@@ -40,6 +40,7 @@ export default class Character {
 		const geometry = new THREE.BoxGeometry(2, 2, 2);
 		const material = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
 		this.character = new THREE.Mesh(geometry, material);
+		this.character.castShadow = true;
 		this.character.position.set(0, 2.5, 0);
 		this.scene.add(this.character);
 

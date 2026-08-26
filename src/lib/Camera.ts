@@ -14,7 +14,7 @@ export default class Camera {
 		this.app = new App();
 		this.canvas = this.app.canvas;
 		this.setInstance();
-		this.setControls();
+		//this.setControls();
 		this.setResizeListner();
 	}
 
@@ -22,14 +22,15 @@ export default class Camera {
 		console.log('Camera setInstance Called');
 
 		this.instance = new THREE.PerspectiveCamera(
-			35,
+			75,
 			get(sizesStore).width / get(sizesStore).height,
 			0.1,
-			200
+			1000
 		);
 
-		this.instance.position.z = 100;
-		this.instance.position.y = 60;
+		this.instance.position.z = 10;
+		this.instance.position.y = 17;
+		this.instance.lookAt(new THREE.Vector3(0, 0, 0));
 	}
 
 	setResizeListner() {
@@ -47,7 +48,7 @@ export default class Camera {
 
 	// This will be called in the renderer loop class
 	loop() {
-		this.controls.update();
+		this.controls?.update();
 		// console.log("Camera loop called");
 	}
 }
