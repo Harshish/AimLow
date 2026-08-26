@@ -35,7 +35,7 @@ export default class App {
 		});
 
 		// Enable Debug
-		debugStore.set({ debug: true });
+		//debugStore.set({ debug: true });
 
 		// Canvas & Scene
 		this.canvas = document.querySelector('canvas.threejs') as HTMLCanvasElement;

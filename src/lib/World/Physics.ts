@@ -32,6 +32,27 @@ export default class Physics {
 		});
 	}
 
+	addParticle(x: number, y: number, z: number, velocity: THREE.Vector3): RAPIER_TYPE.RigidBody {
+		const rigidBodyDesc = this.rapier.RigidBodyDesc.dynamic()
+			.setTranslation(x, y, z)
+			.setLinvel(velocity.x, velocity.y, velocity.z);
+
+		const rigidBody = this.world.createRigidBody(rigidBodyDesc);
+
+		const colliderDesc = this.rapier.ColliderDesc.ball(0.045)
+			.setRestitution(0.15)
+			.setFriction(0.05)
+			.setMass(0.3);
+
+		this.world.createCollider(colliderDesc, rigidBody);
+
+		return rigidBody;
+	}
+
+	removeParticle(rigidBody: RAPIER_TYPE.RigidBody) {
+		this.world.removeRigidBody(rigidBody);
+	}
+
 	add(mesh: THREE.Mesh, type: RigidBodyType, collider: ColliderType) {
 		let rigidBodyType: RAPIER_TYPE.RigidBodyDesc;
 		switch (type) {
@@ -137,33 +158,31 @@ export default class Physics {
 	}
 
 	loop(deltaTime: number) {
-		// Update the ThreeJS Mesh According to Physics World Object
 		if (!this.rapierLoaded) return;
 
 		this.world.timestep = Math.min(deltaTime, 0.1);
 		this.world.step();
 
 		this.meshMap.forEach((rigidBody, mesh) => {
-			const position = new THREE.Vector3().copy(rigidBody.translation());
-			const rotation = new THREE.Quaternion().copy(rigidBody.rotation());
+			const translation = rigidBody.translation();
+			const rotation = rigidBody.rotation();
+
+			const position = new THREE.Vector3(translation.x, translation.y, translation.z);
+
+			const quaternion = new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
 
 			if (mesh.parent) {
-				//for position
 				mesh.parent.worldToLocal(position);
 
-				//for rotation
-				const inverseParentMatrix = new THREE.Matrix4()
-					.extractRotation(mesh.parent.matrixWorld)
-					.invert();
-				const inverseParentRotation = new THREE.Quaternion().setFromRotationMatrix(
-					inverseParentMatrix
-				);
+				const parentQuaternion = new THREE.Quaternion();
+				mesh.parent.getWorldQuaternion(parentQuaternion);
 
-				rotation.premultiply(inverseParentRotation);
+				parentQuaternion.invert();
+				quaternion.premultiply(parentQuaternion);
 			}
 
 			mesh.position.copy(position);
-			mesh.quaternion.copy(rotation);
+			mesh.quaternion.copy(quaternion);
 		});
 	}
 }
