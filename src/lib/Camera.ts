@@ -29,7 +29,7 @@ export default class Camera {
 		);
 
 		this.instance.position.z = 10;
-		this.instance.position.y = 17;
+		this.instance.position.y = 13;
 		this.instance.lookAt(new THREE.Vector3(0, 0, 0));
 	}
 

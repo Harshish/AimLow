@@ -33,7 +33,7 @@ export default class World {
 			this.appStarted = state.started;
 		});
 
-		const hosePos = new THREE.Vector3(0, 6, 12);
+		const hosePos = new THREE.Vector3(0, 4, 12);
 		this.waterJet = new WaterJet(hosePos);
 
 		this.loop(0, 0);
