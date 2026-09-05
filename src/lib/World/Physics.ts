@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import App from '../App';
 import RAPIER_TYPE from '@dimforge/rapier3d-compat';
-import { appStateStore } from '$lib/Utils/Store';
+import { appStateStore, gameStateStore } from '$lib/Utils/Store';
+import { CollisionHandler } from '$lib/Utils/CollisionHandler';
 
 type RigidBodyType = 'fixed' | 'dynamic' | 'kinematic' | 'kinematicPosition';
 type ColliderType = 'cuboid' | 'ball' | 'trimesh';
@@ -11,15 +12,18 @@ export default class Physics {
 	scene: THREE.Scene;
 	world!: RAPIER_TYPE.World;
 	cubeMesh!: THREE.Mesh;
-	rigidBody!: RAPIER_TYPE.RigidBody;
 	rapierLoaded = false;
-	groundRigidBody!: RAPIER_TYPE.RigidBody;
 	rapier!: typeof RAPIER_TYPE;
 	meshMap!: Map<THREE.Mesh, RAPIER_TYPE.RigidBody>;
+	eventQueue!: RAPIER_TYPE.EventQueue;
+	colliderMap!: Map<number, THREE.Mesh>;
+	collisionHandler: CollisionHandler;
 	constructor() {
 		this.app = new App();
 		this.scene = this.app.scene;
 		this.meshMap = new Map();
+		this.colliderMap = new Map<number, THREE.Mesh>();
+		this.collisionHandler = new CollisionHandler();
 
 		import('@dimforge/rapier3d-compat').then(async (module) => {
 			const RAPIER = module.default;
@@ -28,6 +32,7 @@ export default class Physics {
 			this.world = new RAPIER.World(gravity);
 			this.rapier = RAPIER;
 			this.rapierLoaded = true;
+			this.eventQueue = new RAPIER.EventQueue(true);
 			appStateStore.set({ physicsReady: true });
 		});
 	}
@@ -35,7 +40,8 @@ export default class Physics {
 	addParticle(x: number, y: number, z: number, velocity: THREE.Vector3): RAPIER_TYPE.RigidBody {
 		const rigidBodyDesc = this.rapier.RigidBodyDesc.dynamic()
 			.setTranslation(x, y, z)
-			.setLinvel(velocity.x, velocity.y, velocity.z);
+			.setLinvel(velocity.x, velocity.y, velocity.z)
+			.setCcdEnabled(true);
 
 		const rigidBody = this.world.createRigidBody(rigidBodyDesc);
 
@@ -53,7 +59,7 @@ export default class Physics {
 		this.world.removeRigidBody(rigidBody);
 	}
 
-	add(mesh: THREE.Mesh, type: RigidBodyType, collider: ColliderType) {
+	add(mesh: THREE.Mesh, type: RigidBodyType, collider: ColliderType, collision: boolean = false) {
 		let rigidBodyType: RAPIER_TYPE.RigidBodyDesc;
 		switch (type) {
 			case 'dynamic':
@@ -71,7 +77,7 @@ export default class Physics {
 		}
 
 		// Create Physics Wolrld Object
-		this.rigidBody = this.world.createRigidBody(rigidBodyType);
+		let rigidBody = this.world.createRigidBody(rigidBodyType);
 
 		// Define Collider Type
 		let colliderType;
@@ -94,16 +100,21 @@ export default class Physics {
 				break;
 		}
 
-		this.world.createCollider(colliderType, this.rigidBody);
+		if (collision) {
+			colliderType.setActiveEvents(RAPIER_TYPE.ActiveEvents.COLLISION_EVENTS);
+		}
+
+		const colliderDesc = this.world.createCollider(colliderType, rigidBody);
 
 		const worldPosition = mesh.getWorldPosition(new THREE.Vector3());
 		const worldRotation = mesh.getWorldQuaternion(new THREE.Quaternion());
 
-		this.rigidBody.setTranslation(worldPosition, false);
-		this.rigidBody.setRotation(worldRotation, false);
-		this.meshMap.set(mesh, this.rigidBody);
+		rigidBody.setTranslation(worldPosition, false);
+		rigidBody.setRotation(worldRotation, false);
+		this.meshMap.set(mesh, rigidBody);
+		this.colliderMap.set(colliderDesc.handle, mesh);
 
-		return this.rigidBody;
+		return rigidBody;
 	}
 
 	computeCuboidDimensions(mesh: THREE.Mesh): THREE.Vector3 {
@@ -161,7 +172,17 @@ export default class Physics {
 		if (!this.rapierLoaded) return;
 
 		this.world.timestep = Math.min(deltaTime, 0.1);
-		this.world.step();
+		this.world.step(this.eventQueue);
+
+		this.eventQueue.drainCollisionEvents((handle1, handle2, started) => {
+			/* Handle the collision event. */
+
+			const mesh1 = this.colliderMap.get(handle1);
+			const mesh2 = this.colliderMap.get(handle2);
+
+			if (!mesh1 && !mesh2) return;
+			this.collisionHandler.resolveCollision(mesh1, mesh2, started);
+		});
 
 		this.meshMap.forEach((rigidBody, mesh) => {
 			const translation = rigidBody.translation();

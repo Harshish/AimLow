@@ -1,6 +1,17 @@
 <script>
 	import { onMount } from 'svelte';
 	import App from '$lib/App';
+	import { gameStateStore, appStatusStore } from '$lib/Utils/Store';
+
+	let score = $state($gameStateStore.score);
+	gameStateStore.subscribe((value) => {
+		score = value.score;
+	});
+
+	let started = $state($appStatusStore.started);
+	appStatusStore.subscribe((value) => {
+		started = value.started;
+	});
 
 	onMount(() => {
 		new App();
@@ -13,6 +24,9 @@
 	Loading Experience... <span id="progressPercentage"></span>%
 </h1>
 <button class="start">START</button>
+{#if started}
+	<h2 class="score">Score : {score}</h2>
+{/if}
 
 <style>
 	.overlay {
@@ -54,6 +68,19 @@
 		transition: opacity 0.5s;
 		cursor: pointer;
 		display: none;
+	}
+
+	.score {
+		position: absolute;
+		top: 5%;
+		left: 80%;
+		transform: translate(-50%, -50%);
+		color: white;
+		background-color: transparent;
+		font-size: 2rem;
+		font-family: 'Amatic SC';
+		opacity: 1;
+		transition: opacity 1s;
 	}
 
 	@media (hover: hover) and (pointer: fine) {

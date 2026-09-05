@@ -24,3 +24,7 @@ export const inputStore = writable({
 export const debugStore = writable({
 	debug: false
 });
+
+export const gameStateStore = writable({
+	score: 0
+});

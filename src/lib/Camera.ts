@@ -14,7 +14,7 @@ export default class Camera {
 		this.app = new App();
 		this.canvas = this.app.canvas;
 		this.setInstance();
-		//this.setControls();
+		this.setControls();
 		this.setResizeListner();
 	}
 

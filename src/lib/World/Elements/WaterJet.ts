@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import App from '$lib/App';
-import { appStateStore } from '$lib/Utils/Store';
+import { appStateStore, gameStateStore } from '$lib/Utils/Store';
 import type Physics from '$lib/World/Physics';
 import RAPIER_TYPE from '@dimforge/rapier3d-compat';
 
@@ -54,8 +54,39 @@ export class WaterJet {
 		appStateStore.subscribe((state) => {
 			if (state.physicsReady) {
 				this.physics = this.app?.world?.physics;
+				this.physics.collisionHandler.addCollisionHandler(
+					'ground',
+					undefined,
+					this.handleCollision
+				);
+				this.physics.collisionHandler.addCollisionHandler(
+					'urinal',
+					undefined,
+					this.handleCollision
+				);
 			}
 		});
+	}
+
+	private handleCollision(
+		mesh1: THREE.Mesh | undefined,
+		mesh2: THREE.Mesh | undefined,
+		started: boolean
+	) {
+		if (!started) return;
+		let name = mesh1 ? mesh1.userData.name : mesh2?.userData.name;
+		if (name === 'urinal') {
+			gameStateStore.update((state) => {
+				state.score += 1;
+				return state;
+			});
+		}
+		if (name === 'ground') {
+			gameStateStore.update((state) => {
+				state.score -= 1;
+				return state;
+			});
+		}
 	}
 
 	private spawnWater() {

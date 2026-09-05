@@ -60,9 +60,11 @@ export default class Environment {
 		urinal.scale.set(12, 12, 12);
 		urinal.position.set(0, -3, 2);
 		urinal.rotation.y = 2 * Math.PI;
+		urinal.userData.name = 'urinal';
 		urinal.traverse((child) => {
 			if ((child as THREE.Mesh).isMesh) {
-				this.physics.add(child as THREE.Mesh, 'kinematic', 'trimesh');
+				this.physics.add(child as THREE.Mesh, 'fixed', 'trimesh', true);
+				child.userData.name = 'urinal';
 				child.castShadow = true;
 				child.receiveShadow = true;
 			}
@@ -89,7 +91,8 @@ export default class Environment {
 		this.groundMesh.position.set(0, 0, 0);
 		this.groundMesh.rotation.x = -Math.PI / 2;
 		this.groundMesh.receiveShadow = true;
+		this.groundMesh.userData = { name: 'ground' };
 		this.scene.add(this.groundMesh);
-		this.physics.add(this.groundMesh, 'fixed', 'cuboid');
+		this.physics.add(this.groundMesh, 'fixed', 'cuboid', true);
 	}
 }
