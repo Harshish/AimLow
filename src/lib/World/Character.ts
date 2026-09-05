@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from 'three/webgpu';
 import App from '../App.js';
 import RAPIER from '@dimforge/rapier3d-compat';
 import Physics from './Physics';

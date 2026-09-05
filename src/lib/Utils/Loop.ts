@@ -2,7 +2,7 @@ import App from '../App';
 import Camera from '../Camera';
 import Renderer from '../Renderer';
 import World from '../World/World';
-import * as THREE from 'three';
+import * as THREE from 'three/webgpu';
 import RapierDebugger from './RapierDebugger';
 import { debugStore } from '../Utils/Store';
 

@@ -1,11 +1,20 @@
-import * as THREE from 'three';
+import * as THREE from 'three/webgpu';
 import App from '$lib/App';
 import { appStateStore, gameStateStore } from '$lib/Utils/Store';
 import type Physics from '$lib/World/Physics';
 import RAPIER_TYPE from '@dimforge/rapier3d-compat';
 
+/*
+Rapier particles
+       ↓
+Float32Array positions
+       ↓
+Instanced quad
+       ↓
+WebGPU
+*/
+
 type Particle = {
-	life: number;
 	body: RAPIER_TYPE.RigidBody;
 };
 
@@ -20,30 +29,29 @@ export class WaterJet {
 	halfY: number = window.innerHeight / 2;
 	scene: THREE.Scene;
 	acc: number = 0;
-	geometry!: THREE.BufferGeometry;
-	material!: THREE.PointsMaterial;
-	points!: THREE.Points;
-	positions!: Float32Array;
-	maxParticles: number = 300;
+	geometry!: THREE.PlaneGeometry;
+	material!: THREE.MeshBasicNodeMaterial;
+	particlesMesh!: THREE.InstancedMesh;
+	maxParticles: number = 200;
+	emitRate: number = 100;
+	private instanceMatrix = new THREE.Matrix4();
 	constructor(startPos: THREE.Vector3) {
 		this.app = new App();
 		this.scene = this.app.scene;
 		this.startPos = startPos.clone();
 
 		// Water Droplet
-		this.positions = new Float32Array(this.maxParticles * 3);
-		this.geometry = new THREE.BufferGeometry();
-		this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
-		const material = new THREE.PointsMaterial({
-			color: 0x66ccff,
-			size: 0.09,
-			transparent: true,
-			opacity: 0.6,
-			depthWrite: false,
-			blending: THREE.AdditiveBlending
+		const DROPLET_SIZE = 0.15;
+
+		this.geometry = new THREE.PlaneGeometry(DROPLET_SIZE, DROPLET_SIZE);
+
+		this.material = new THREE.MeshBasicNodeMaterial({
+			color: 0xff0000
 		});
-		this.points = new THREE.Points(this.geometry, material);
-		this.scene.add(this.points);
+
+		this.particlesMesh = new THREE.InstancedMesh(this.geometry, this.material, this.maxParticles);
+		this.particlesMesh.count = 0;
+		this.scene.add(this.particlesMesh);
 
 		this.onPointerMove = this.onPointerMove.bind(this);
 		window.addEventListener('pointermove', this.onPointerMove);
@@ -116,8 +124,7 @@ export class WaterJet {
 		);
 
 		this.particles.push({
-			body,
-			life: 5
+			body
 		});
 
 		if (this.particles.length > this.maxParticles) {
@@ -139,9 +146,7 @@ export class WaterJet {
 	private update(deltaTime: number) {
 		if (!this.physics) return;
 
-		const EMIT_RATE = 150; // hose strength
-
-		this.acc += deltaTime * EMIT_RATE;
+		this.acc += deltaTime * this.emitRate;
 
 		while (this.acc >= 1) {
 			this.spawnWater();
@@ -149,32 +154,33 @@ export class WaterJet {
 		}
 
 		// update particles
-		for (let i = this.particles.length - 1; i >= 0; i--) {
-			const particle = this.particles[i];
-			particle.life -= deltaTime;
-
-			if (particle.life <= 0) {
-				this.physics.removeParticle(particle.body);
-				this.particles.splice(i, 1);
-			}
-		}
+		// for (let i = this.particles.length - 1; i >= 0; i--) {
+		// 	const particle = this.particles[i];
+		// 	particle.life -= deltaTime;
+		//
+		// 	if (particle.life <= 0) {
+		// 		this.physics.removeParticle(particle.body);
+		// 		this.particles.splice(i, 1);
+		// 	}
+		// }
 	}
 
 	loop(deltaTime: number) {
 		if (!this.physics) return;
 		this.update(deltaTime);
 
-		// render particles as simple points (cheap + fast)
 		let index = 0;
 		for (const particle of this.particles) {
 			const translation = particle.body.translation();
-			this.positions[index++] = translation.x;
-			this.positions[index++] = translation.y;
-			this.positions[index++] = translation.z;
+
+			this.instanceMatrix.makeTranslation(translation.x, translation.y, translation.z);
+
+			this.particlesMesh.setMatrixAt(index, this.instanceMatrix);
+
+			index++;
 		}
-		this.geometry.setDrawRange(0, index);
-		const positionAttribute = this.geometry.attributes.position;
-		positionAttribute.needsUpdate = true;
+		this.particlesMesh.count = index;
+		this.particlesMesh.instanceMatrix.needsUpdate = true;
 	}
 
 	dispose() {
@@ -187,11 +193,8 @@ export class WaterJet {
 			}
 		}
 
+		this.scene.remove(this.particlesMesh);
 		this.particles.length = 0;
-
-		this.scene.remove(this.points);
-
 		this.geometry.dispose();
-		this.material.dispose();
 	}
 }

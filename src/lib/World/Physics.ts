@@ -1,7 +1,7 @@
-import * as THREE from 'three';
+import * as THREE from 'three/webgpu';
 import App from '../App';
 import RAPIER_TYPE from '@dimforge/rapier3d-compat';
-import { appStateStore, gameStateStore } from '$lib/Utils/Store';
+import { appStateStore } from '$lib/Utils/Store';
 import { CollisionHandler } from '$lib/Utils/CollisionHandler';
 
 type RigidBodyType = 'fixed' | 'dynamic' | 'kinematic' | 'kinematicPosition';
