@@ -16,6 +16,7 @@ WebGPU
 
 type Particle = {
 	body: RAPIER_TYPE.RigidBody;
+	life: number;
 };
 
 export class WaterJet {
@@ -32,8 +33,9 @@ export class WaterJet {
 	geometry!: THREE.PlaneGeometry;
 	material!: THREE.MeshBasicNodeMaterial;
 	particlesMesh!: THREE.InstancedMesh;
-	maxParticles: number = 200;
-	emitRate: number = 100;
+	maxParticles: number = 300;
+	emitRate: number = 150;
+	particleLife: number = 2;
 	private instanceMatrix = new THREE.Matrix4();
 	constructor(startPos: THREE.Vector3) {
 		this.app = new App();
@@ -124,7 +126,8 @@ export class WaterJet {
 		);
 
 		this.particles.push({
-			body
+			body,
+			life: this.particleLife
 		});
 
 		if (this.particles.length > this.maxParticles) {
@@ -154,15 +157,15 @@ export class WaterJet {
 		}
 
 		// update particles
-		// for (let i = this.particles.length - 1; i >= 0; i--) {
-		// 	const particle = this.particles[i];
-		// 	particle.life -= deltaTime;
-		//
-		// 	if (particle.life <= 0) {
-		// 		this.physics.removeParticle(particle.body);
-		// 		this.particles.splice(i, 1);
-		// 	}
-		// }
+		for (let i = this.particles.length - 1; i >= 0; i--) {
+			const particle = this.particles[i];
+			particle.life -= deltaTime;
+
+			if (particle.life <= 0) {
+				this.physics.removeParticle(particle.body);
+				this.particles.splice(i, 1);
+			}
+		}
 	}
 
 	loop(deltaTime: number) {

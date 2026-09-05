@@ -17,6 +17,9 @@ export default class Physics {
 	eventQueue!: RAPIER_TYPE.EventQueue;
 	colliderMap!: Map<number, THREE.Mesh>;
 	collisionHandler: CollisionHandler;
+	private static readonly GROUP_PARTICLE = 1 << 3;
+	private static readonly GROUP_WORLD = 1 << 0;
+
 	constructor() {
 		this.app = new App();
 		this.scene = this.app.scene;
@@ -47,7 +50,8 @@ export default class Physics {
 		const colliderDesc = this.rapier.ColliderDesc.ball(0.045)
 			.setRestitution(0.15)
 			.setFriction(0.05)
-			.setMass(0.3);
+			.setMass(0.3)
+			.setCollisionGroups((Physics.GROUP_PARTICLE << 16) | Physics.GROUP_WORLD);
 
 		this.world.createCollider(colliderDesc, rigidBody);
 
@@ -101,6 +105,7 @@ export default class Physics {
 
 		if (collision) {
 			colliderType.setActiveEvents(RAPIER_TYPE.ActiveEvents.COLLISION_EVENTS);
+			colliderType.setCollisionGroups((Physics.GROUP_WORLD << 16) | Physics.GROUP_PARTICLE);
 		}
 
 		const colliderDesc = this.world.createCollider(colliderType, rigidBody);
