@@ -11,7 +11,6 @@ export default class Physics {
 	app: App;
 	scene: THREE.Scene;
 	world!: RAPIER_TYPE.World;
-	cubeMesh!: THREE.Mesh;
 	rapierLoaded = false;
 	rapier!: typeof RAPIER_TYPE;
 	meshMap!: Map<THREE.Mesh, RAPIER_TYPE.RigidBody>;

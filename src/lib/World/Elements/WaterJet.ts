@@ -64,6 +64,7 @@ export class WaterJet {
 					undefined,
 					this.handleCollision
 				);
+				this.physics.collisionHandler.addCollisionHandler('wall', undefined, this.handleCollision);
 			}
 		});
 	}
@@ -81,7 +82,7 @@ export class WaterJet {
 				return state;
 			});
 		}
-		if (name === 'ground') {
+		if (name === 'ground' || name === 'wall') {
 			gameStateStore.update((state) => {
 				state.score -= 1;
 				return state;

@@ -19,6 +19,16 @@ const assetsToLoad: Asset[] = [
 		path: '/models/urinal.glb',
 		id: 'urinal',
 		type: 'model'
+	},
+	{
+		path: '/textures/t_inkpaint.jpg',
+		id: 'wall_graffiti',
+		type: 'texture'
+	},
+	{
+		path: '/textures/floor.png',
+		id: 'floor',
+		type: 'texture'
 	}
 ];
 

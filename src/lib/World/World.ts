@@ -4,7 +4,6 @@ import Physics from './Physics';
 import Environment from './Environment';
 import { appStateStore } from '$lib/Utils/Store';
 import { appStatusStore } from '../Utils/Store';
-import Character from './Character';
 import { WaterJet } from '$lib/World/Elements/WaterJet';
 
 export default class World {
@@ -12,7 +11,6 @@ export default class World {
 	scene: THREE.Scene;
 	physics: Physics;
 	environment!: Environment;
-	character!: Character;
 	appStarted: boolean = false;
 	waterJet: WaterJet;
 	constructor() {
@@ -25,7 +23,6 @@ export default class World {
 		appStateStore.subscribe((state) => {
 			if (state.physicsReady) {
 				this.environment = new Environment();
-				this.character = new Character();
 			}
 		});
 
@@ -43,6 +40,5 @@ export default class World {
 		if (!this.appStarted) return;
 		this.waterJet.loop(deltaTime);
 		this.physics.loop(deltaTime);
-		if (this.character) this.character.loop(deltaTime);
 	}
 }

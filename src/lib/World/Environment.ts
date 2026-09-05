@@ -12,8 +12,6 @@ export default class Environment {
 	scene!: THREE.Scene;
 	directionalLight!: THREE.DirectionalLight;
 	physics!: Physics;
-	cubeMesh!: THREE.Mesh;
-	cubeMesh2!: THREE.Mesh;
 	groundMesh!: THREE.Mesh;
 	constructor() {
 		this.app = new App();
@@ -22,6 +20,7 @@ export default class Environment {
 
 		this.loadEnvironment();
 		this.addGround();
+		this.addWall();
 	}
 
 	addLights() {
@@ -79,20 +78,36 @@ export default class Environment {
 	}
 
 	addGround() {
+		const texture = get(assetStore).loadedAssets['floor'] as THREE.Texture;
 		this.groundMesh = new THREE.Mesh(
-			new THREE.CircleGeometry(30, 32),
-			new THREE.MeshPhongMaterial({
-				color: 0x222222,
-				emissive: 0x072534,
-				side: THREE.DoubleSide,
-				flatShading: true
+			new THREE.BoxGeometry(64, 64, 1),
+			new THREE.MeshStandardMaterial({
+				metalness: 0.1,
+				roughness: 0.2,
+				map: texture
 			})
 		);
-		this.groundMesh.position.set(0, 0, 0);
+		this.groundMesh.position.set(0, 0, 11);
 		this.groundMesh.rotation.x = -Math.PI / 2;
 		this.groundMesh.receiveShadow = true;
 		this.groundMesh.userData = { name: 'ground' };
 		this.scene.add(this.groundMesh);
 		this.physics.add(this.groundMesh, 'fixed', 'cuboid', true);
+	}
+
+	addWall() {
+		const texture = get(assetStore).loadedAssets['wall_graffiti'] as THREE.Texture;
+		const material = new THREE.MeshStandardMaterial({
+			metalness: 0.3,
+			roughness: 0.4,
+			map: texture
+		});
+
+		const wall = new THREE.Mesh(new THREE.BoxGeometry(64, 64, 1), material);
+		wall.position.set(0, 10, 0.5);
+		wall.receiveShadow = true;
+		wall.userData = { name: 'wall' };
+		this.scene.add(wall);
+		this.physics.add(wall, 'fixed', 'cuboid', true);
 	}
 }
