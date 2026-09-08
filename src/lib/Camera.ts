@@ -28,9 +28,9 @@ export default class Camera {
 			1000
 		);
 
-		this.instance.position.z = 10;
-		this.instance.position.y = 13;
-		this.instance.lookAt(new THREE.Vector3(0, 0, 0));
+		this.instance.position.z = 17;
+		this.instance.position.y = 21;
+		//this.instance.lookAt(new THREE.Vector3(0, 0, 0));
 	}
 
 	setResizeListner() {

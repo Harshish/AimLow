@@ -4,7 +4,6 @@ import Renderer from '../Renderer';
 import World from '../World/World';
 import * as THREE from 'three/webgpu';
 import RapierDebugger from './RapierDebugger';
-import { debugStore } from '../Utils/Store';
 
 export default class Loop {
 	app: App;
@@ -20,10 +19,7 @@ export default class Loop {
 		this.renderer = this.app.renderer;
 		this.world = this.app.world;
 
-		debugStore.subscribe((state) => {
-			if (state.debug) this.debugger = new RapierDebugger();
-			else if (this.debugger) this.app.scene.remove(this.debugger.mesh);
-		});
+		//this.debugger = new RapierDebugger();
 
 		this.timer = new THREE.Timer();
 		this.loop();

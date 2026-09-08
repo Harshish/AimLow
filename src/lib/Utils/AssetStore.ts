@@ -12,12 +12,23 @@ type AssetStore = {
 	assetsToLoad: Asset[];
 	loadedAssets: Record<string, THREE.Texture | GLTF>;
 	addLoadedAsset: (asset: THREE.Texture | GLTF, id: string) => void;
+	ready: boolean;
 };
 
 const assetsToLoad: Asset[] = [
 	{
 		path: '/models/urinal.glb',
 		id: 'urinal',
+		type: 'model'
+	},
+	{
+		path: '/models/wasp.glb',
+		id: 'wasp',
+		type: 'model'
+	},
+	{
+		path: '/models/spider.glb',
+		id: 'spider',
 		type: 'model'
 	},
 	{
@@ -36,12 +47,21 @@ export const assetStore = writable<AssetStore>({
 	assetsToLoad,
 	loadedAssets: {},
 	addLoadedAsset: (asset, id) => {
-		assetStore.update((state) => ({
-			...state,
-			loadedAssets: {
-				...state.loadedAssets,
-				[id]: asset
+		assetStore.update((state) => {
+			let isReady = false;
+			if (Object.keys(state.loadedAssets).length + 1 === assetsToLoad.length) {
+				isReady = true;
 			}
-		}));
-	}
+
+			return {
+				...state,
+				loadedAssets: {
+					...state.loadedAssets,
+					[id]: asset
+				},
+				ready: isReady
+			};
+		});
+	},
+	ready: false
 });

@@ -4,16 +4,6 @@ import { appStateStore, gameStateStore } from '$lib/Utils/Store';
 import type Physics from '$lib/World/Physics';
 import RAPIER_TYPE from '@dimforge/rapier3d-compat';
 
-/*
-Rapier particles
-       ↓
-Float32Array positions
-       ↓
-Instanced quad
-       ↓
-WebGPU
-*/
-
 type Particle = {
 	body: RAPIER_TYPE.RigidBody;
 	life: number;
@@ -35,7 +25,8 @@ export class WaterJet {
 	particlesMesh!: THREE.InstancedMesh;
 	maxParticles: number = 300;
 	emitRate: number = 150;
-	particleLife: number = 2;
+	particleLife: number = 3;
+	waterColor: THREE.Color;
 	private instanceMatrix = new THREE.Matrix4();
 	constructor(startPos: THREE.Vector3) {
 		this.app = new App();
@@ -43,12 +34,17 @@ export class WaterJet {
 		this.startPos = startPos.clone();
 
 		// Water Droplet
-		const DROPLET_SIZE = 0.15;
+		const DROPLET_SIZE = 0.2;
 
 		this.geometry = new THREE.PlaneGeometry(DROPLET_SIZE, DROPLET_SIZE);
 
+		this.waterColor = new THREE.Color(0x4fc3f7);
+
 		this.material = new THREE.MeshBasicNodeMaterial({
-			color: 0xff0000
+			color: this.waterColor,
+			transparent: true,
+			opacity: 0.55,
+			depthWrite: false
 		});
 
 		this.particlesMesh = new THREE.InstancedMesh(this.geometry, this.material, this.maxParticles);
