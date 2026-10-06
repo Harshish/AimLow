@@ -1,68 +1,51 @@
-import { inputStore } from '../Utils/Store';
-import { get } from 'svelte/store';
+import { inputStore } from '../Utils/Store.ts';
+
+const directions = {
+	forward: ['KeyW', 'ArrowUp'],
+	backward: ['KeyS', 'ArrowDown'],
+	left: ['KeyA', 'ArrowLeft'],
+	right: ['KeyD', 'ArrowRight']
+} as const;
+const movementKeys = new Set<string>(Object.values(directions).flat());
 
 export default class InputController {
-	inputStore: typeof inputStore;
-	keyPressed: { [key: string]: boolean };
+	private readonly pressed = new Set<string>();
+
 	constructor() {
-		this.startListening();
-		this.inputStore = inputStore;
-		this.keyPressed = {};
+		this.reset();
+		window.addEventListener('keydown', this.onKeyDown);
+		window.addEventListener('keyup', this.onKeyUp);
+		window.addEventListener('blur', this.reset);
 	}
 
-	startListening() {
-		window.addEventListener('keydown', (event) => {
-			this.onKeyDown(event);
+	private onKeyDown = (event: KeyboardEvent) => {
+		if (!movementKeys.has(event.code) || this.pressed.has(event.code)) return;
+		this.pressed.add(event.code);
+		this.publish();
+	};
+
+	private onKeyUp = (event: KeyboardEvent) => {
+		if (this.pressed.delete(event.code)) this.publish();
+	};
+
+	private publish() {
+		inputStore.set({
+			forward: directions.forward.some((key) => this.pressed.has(key)),
+			backward: directions.backward.some((key) => this.pressed.has(key)),
+			left: directions.left.some((key) => this.pressed.has(key)),
+			right: directions.right.some((key) => this.pressed.has(key))
 		});
-
-		window.addEventListener('keyup', (event) => {
-			this.onKeyUp(event);
-		});
 	}
 
-	onKeyDown(event: KeyboardEvent) {
-		if (this.keyPressed[event.code]) return;
+	private reset = () => {
+		this.pressed.clear();
+		this.publish();
+	};
 
-		switch (event.code) {
-			case 'KeyW':
-			case 'ArrowUp':
-				inputStore.set({ ...get(inputStore), forward: true });
-				break;
-			case 'KeyA':
-			case 'ArrowLeft':
-				inputStore.set({ ...get(inputStore), left: true });
-				break;
-			case 'KeyS':
-			case 'ArrowDown':
-				inputStore.set({ ...get(inputStore), backward: true });
-				break;
-			case 'KeyD':
-			case 'ArrowRight':
-				inputStore.set({ ...get(inputStore), right: true });
-				break;
-		}
-		this.keyPressed[event.code] = true;
-	}
-
-	onKeyUp(event: KeyboardEvent) {
-		switch (event.code) {
-			case 'KeyW':
-			case 'ArrowUp':
-				inputStore.set({ ...get(inputStore), forward: false });
-				break;
-			case 'KeyA':
-			case 'ArrowLeft':
-				inputStore.set({ ...get(inputStore), left: false });
-				break;
-			case 'KeyS':
-			case 'ArrowDown':
-				inputStore.set({ ...get(inputStore), backward: false });
-				break;
-			case 'KeyD':
-			case 'ArrowRight':
-				inputStore.set({ ...get(inputStore), right: false });
-				break;
-		}
-		this.keyPressed[event.code] = false;
+	dispose() {
+		window.removeEventListener('keydown', this.onKeyDown);
+		window.removeEventListener('keyup', this.onKeyUp);
+		window.removeEventListener('blur', this.reset);
+		this.reset();
 	}
 }

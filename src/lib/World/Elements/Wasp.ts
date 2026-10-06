@@ -1,24 +1,15 @@
 import * as THREE from 'three/webgpu';
-import { assetStore } from '$lib/Utils/AssetStore';
-import { get } from 'svelte/store';
+
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type Physics from '$lib/World/Physics';
-import App from '$lib/App';
 
 export class Wasp {
-	app: App;
-	physics!: Physics;
 	alive = true;
-	scene!: THREE.Scene;
-	constructor() {
-		this.app = new App();
-		this.scene = this.app.scene;
-		this.physics = this.app?.world?.physics;
-		this.init();
-	}
-
-	init() {
-		const gltfAsset = get(assetStore).loadedAssets['wasp'] as GLTF;
+	constructor(
+		private readonly scene: THREE.Scene,
+		private readonly physics: Physics,
+		gltfAsset: GLTF
+	) {
 		const wasp = gltfAsset.scene;
 		// wasp.scale.set(12, 12, 12);
 		wasp.position.set(5, 7, 5);

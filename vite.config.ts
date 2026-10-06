@@ -1,7 +1,6 @@
 import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
-import wasm from 'vite-plugin-wasm';
-import topLevelAwait from 'vite-plugin-top-level-await';
 
-export default defineConfig({ plugins: [tailwindcss(), sveltekit(), wasm(), topLevelAwait()] });
+// Rapier's compat build initializes embedded WASM explicitly; no transform plugins needed.
+export default defineConfig({ plugins: [tailwindcss(), sveltekit()] });

@@ -1,54 +1,26 @@
 import * as THREE from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import App from './App';
-import { sizesStore } from './Utils/Store';
-import { get } from 'svelte/store';
 
 export default class Camera {
-	app!: App;
-	canvas!: HTMLCanvasElement;
-	instance!: THREE.PerspectiveCamera;
-	controls!: OrbitControls;
-	constructor() {
-		console.log('Camera Init');
-		this.app = new App();
-		this.canvas = this.app.canvas;
-		this.setInstance();
-		this.setControls();
-		this.setResizeListner();
-	}
+	readonly instance = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+	readonly controls: OrbitControls;
 
-	setInstance() {
-		console.log('Camera setInstance Called');
-
-		this.instance = new THREE.PerspectiveCamera(
-			75,
-			get(sizesStore).width / get(sizesStore).height,
-			0.1,
-			1000
-		);
-
-		this.instance.position.z = 17;
-		this.instance.position.y = 21;
-		//this.instance.lookAt(new THREE.Vector3(0, 0, 0));
-	}
-
-	setResizeListner() {
-		sizesStore.subscribe((sizes) => {
-			this.instance.aspect = sizes.width / sizes.height;
-			this.instance.updateProjectionMatrix();
-		});
-	}
-
-	setControls() {
-		// instantiate the controls
-		this.controls = new OrbitControls(this.instance, this.canvas);
+	constructor(canvas: HTMLCanvasElement) {
+		this.instance.position.set(0, 21, 17);
+		this.controls = new OrbitControls(this.instance, canvas);
 		this.controls.enableDamping = true;
 	}
 
-	// This will be called in the renderer loop class
+	resize(width: number, height: number) {
+		this.instance.aspect = width / height;
+		this.instance.updateProjectionMatrix();
+	}
+
 	loop() {
-		this.controls?.update();
-		// console.log("Camera loop called");
+		this.controls.update();
+	}
+
+	dispose() {
+		this.controls.dispose();
 	}
 }

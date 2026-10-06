@@ -1,25 +1,15 @@
 import * as THREE from 'three/webgpu';
-import { assetStore } from '$lib/Utils/AssetStore';
-import { get } from 'svelte/store';
+
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type Physics from '$lib/World/Physics';
-import App from '$lib/App';
 
 export class Spider {
-	app: App;
-	physics!: Physics;
 	alive = true;
-	scene!: THREE.Scene;
-	constructor() {
-		this.app = new App();
-		this.scene = this.app.scene;
-
-		this.physics = this.app?.world?.physics;
-		this.init();
-	}
-
-	init() {
-		const gltfAsset = get(assetStore).loadedAssets['spider'] as GLTF;
+	constructor(
+		private readonly scene: THREE.Scene,
+		private readonly physics: Physics,
+		gltfAsset: GLTF
+	) {
 		const spider = gltfAsset.scene;
 		spider.position.set(7, 3, 5);
 		spider.scale.set(0.1, 0.1, 0.1);
