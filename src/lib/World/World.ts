@@ -2,12 +2,10 @@ import * as THREE from 'three/webgpu';
 import type Physics from './Physics';
 import Environment from './Environment';
 import type { LoadedAssets } from '../Utils/Assets';
-import FixedStep from '../Utils/FixedStep';
 import { WaterJet } from './Elements/WaterJet';
 
 export default class World {
 	started = false;
-	private readonly clock = new FixedStep();
 	private readonly waterJet: WaterJet;
 
 	constructor(
@@ -26,8 +24,9 @@ export default class World {
 
 	loop(deltaTime: number) {
 		if (!this.started) return;
-		this.clock.advance(deltaTime, this.step);
-		// Upload once per render, after all simulation steps.
+		// One Rapier step per rendered frame. Loop bounds stalls without fixing the rate.
+		if (Number.isFinite(deltaTime) && deltaTime > 0) this.step(deltaTime);
+		// Upload once per render, after the simulation step.
 		this.waterJet.syncInstances();
 	}
 

@@ -3,7 +3,6 @@ import { test, type TestContext } from 'node:test';
 import * as THREE from 'three/webgpu';
 import { get } from 'svelte/store';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
-import FixedStep from '../src/lib/Utils/FixedStep';
 import Loop from '../src/lib/Utils/Loop';
 import InputController from '../src/lib/UI/InputController';
 import { inputStore, gameStateStore } from '../src/lib/Utils/Store';
@@ -31,34 +30,6 @@ function model(): GLTF {
 	// Only scene resources are used by the loader; parser internals are irrelevant here.
 	return { scene, scenes: [scene], animations: [], cameras: [], asset: {} } as unknown as GLTF;
 }
-
-test('fixed simulation produces 60 steps per second across rendering rates', () => {
-	for (const fps of [30, 60, 120, 144]) {
-		const clock = new FixedStep();
-		let steps = 0;
-		for (let frame = 0; frame < fps; frame++) {
-			clock.advance(1 / fps, (delta) => {
-				assert.equal(delta, 1 / 60);
-				steps++;
-			});
-		}
-		assert.equal(steps, 60, `${fps} FPS`);
-	}
-});
-
-test('fixed simulation bounds catch-up and rejects invalid elapsed times', () => {
-	const clock = new FixedStep();
-	let steps = 0;
-	const step = () => steps++;
-	for (const delta of [0, -1, NaN, Infinity]) clock.advance(delta, step);
-	assert.equal(steps, 0);
-	clock.advance(30, step);
-	assert.equal(steps, 6);
-	clock.advance(1 / 120, step);
-	assert.equal(steps, 6);
-	clock.advance(1 / 120, step);
-	assert.equal(steps, 7);
-});
 
 test('animation loop starts once, bounds elapsed time, and cancels on disposal', (t) => {
 	let id = 0;
