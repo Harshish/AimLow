@@ -82,48 +82,71 @@ export default class Environment {
 		this.addGround();
 		this.addWall();
 
-		const wasp = new Wasp();
-		const spider = new Spider();
+		new Wasp();
+		new Spider();
 	}
 
 	addGround() {
 		const texture = get(assetStore).loadedAssets['floor'] as THREE.Texture;
+		texture.colorSpace = THREE.SRGBColorSpace;
 		texture.wrapS = THREE.RepeatWrapping;
 		texture.wrapT = THREE.RepeatWrapping;
 		texture.repeat.set(8, 8);
+
 		this.groundMesh = new THREE.Mesh(
 			new THREE.PlaneGeometry(128, 128),
 			new THREE.MeshStandardMaterial({
-				metalness: 0.7,
-				roughness: 0.3,
-				map: texture
+				map: texture,
+				metalness: 0.2,
+				roughness: 0.4,
+				color: 0xffffff
 			})
 		);
+
 		this.groundMesh.position.set(0, 0, 19.2);
 		this.groundMesh.rotation.x = -Math.PI / 2;
 		this.groundMesh.receiveShadow = true;
 		this.groundMesh.userData = { name: 'ground' };
+
 		this.scene.add(this.groundMesh);
 		this.physics.add(this.groundMesh, 'fixed', 'cuboid', true);
 	}
 
 	addWall() {
-		const texture = get(assetStore).loadedAssets['wall_graffiti'] as THREE.Texture;
+		const texture = get(assetStore).loadedAssets['wall'] as THREE.Texture;
 		texture.wrapS = THREE.RepeatWrapping;
 		texture.wrapT = THREE.RepeatWrapping;
-		texture.repeat.set(3, 3);
+		texture.repeat.set(6, 6);
 
 		const material = new THREE.MeshStandardMaterial({
-			metalness: 0.7,
-			roughness: 0.5,
-			map: texture
+			map: texture,
+			roughness: 1.0,
+			metalness: 0
 		});
 
+		const graffiti_texture = get(assetStore).loadedAssets['graffiti'] as THREE.Texture;
+		graffiti_texture.colorSpace = THREE.SRGBColorSpace;
+
+		const material2 = new THREE.MeshBasicMaterial({
+			map: graffiti_texture,
+			transparent: true,
+			alphaTest: 0.1,
+			side: THREE.DoubleSide
+		});
+
+		const gwall = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), material2);
+
+		gwall.position.set(0, 15, 0.6);
+
 		const wall = new THREE.Mesh(new THREE.PlaneGeometry(128, 128), material);
+
 		wall.position.set(0, 10, 0.5);
 		wall.receiveShadow = true;
 		wall.userData = { name: 'wall' };
+
 		this.scene.add(wall);
+		this.scene.add(gwall);
+
 		this.physics.add(wall, 'fixed', 'cuboid', true);
 	}
 }

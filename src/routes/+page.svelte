@@ -75,9 +75,9 @@
 		top: 5%;
 		left: 80%;
 		transform: translate(-50%, -50%);
-		color: white;
+		color: black;
 		background-color: transparent;
-		font-size: 2rem;
+		font-size: 3rem;
 		font-family: 'Amatic SC';
 		opacity: 1;
 		transition: opacity 1s;

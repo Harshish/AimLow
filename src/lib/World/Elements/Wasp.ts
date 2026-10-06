@@ -1,6 +1,5 @@
 import * as THREE from 'three/webgpu';
 import { assetStore } from '$lib/Utils/AssetStore';
-import { appStateStore, gameStateStore } from '$lib/Utils/Store';
 import { get } from 'svelte/store';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type Physics from '$lib/World/Physics';
@@ -14,18 +13,8 @@ export class Wasp {
 	constructor() {
 		this.app = new App();
 		this.scene = this.app.scene;
-
-		appStateStore.subscribe((state) => {
-			if (state.physicsReady) {
-				this.physics = this.app?.world?.physics;
-			}
-		});
-
-		assetStore.subscribe((state) => {
-			if (state.ready) {
-				this.init();
-			}
-		});
+		this.physics = this.app?.world?.physics;
+		this.init();
 	}
 
 	init() {
