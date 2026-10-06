@@ -1,8 +1,7 @@
 import * as THREE from 'three/webgpu';
-import App from '$lib/App';
-import { appStateStore, gameStateStore } from '$lib/Utils/Store';
+import { gameStateStore } from '../../Utils/Store';
 import type Physics from '$lib/World/Physics';
-import RAPIER_TYPE from '@dimforge/rapier3d-compat';
+import type RAPIER_TYPE from '@dimforge/rapier3d-compat';
 
 type Particle = {
 	body: RAPIER_TYPE.RigidBody;
@@ -10,15 +9,12 @@ type Particle = {
 };
 
 export class WaterJet {
-	app: App;
-	physics!: Physics;
 	startPos!: THREE.Vector3;
 	particles: Particle[] = [];
 	mouseX: number = 0;
 	mouseY: number = 0;
 	halfX: number = window.innerWidth / 2;
 	halfY: number = window.innerHeight / 2;
-	scene: THREE.Scene;
 	acc: number = 0;
 	geometry!: THREE.PlaneGeometry;
 	material!: THREE.MeshBasicNodeMaterial;
@@ -27,10 +23,15 @@ export class WaterJet {
 	emitRate: number = 150;
 	particleLife: number = 3;
 	waterColor: THREE.Color;
-	private instanceMatrix = new THREE.Matrix4();
-	constructor(startPos: THREE.Vector3) {
-		this.app = new App();
-		this.scene = this.app.scene;
+	private readonly instanceMatrix = new THREE.Matrix4();
+	private readonly velocity = new THREE.Vector3();
+	private readonly removeCollisionHandlers: (() => void)[];
+	private disposed = false;
+	constructor(
+		private readonly scene: THREE.Scene,
+		private readonly physics: Physics,
+		startPos: THREE.Vector3
+	) {
 		this.startPos = startPos.clone();
 
 		// Water Droplet
@@ -49,6 +50,9 @@ export class WaterJet {
 
 		this.particlesMesh = new THREE.InstancedMesh(this.geometry, this.material, this.maxParticles);
 		this.particlesMesh.count = 0;
+		this.particlesMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+		// Instances move every frame; a cached bounding sphere would cull live droplets.
+		this.particlesMesh.frustumCulled = false;
 		this.scene.add(this.particlesMesh);
 
 		this.onPointerMove = this.onPointerMove.bind(this);
@@ -57,54 +61,27 @@ export class WaterJet {
 		this.onWindowResize = this.onWindowResize.bind(this);
 		window.addEventListener('resize', this.onWindowResize);
 
-		appStateStore.subscribe((state) => {
-			if (state.physicsReady) {
-				this.physics = this.app?.world?.physics;
-				this.physics.collisionHandler.addCollisionHandler(
-					'ground',
-					undefined,
-					this.handleCollision
-				);
-				this.physics.collisionHandler.addCollisionHandler(
-					'urinal',
-					undefined,
-					this.handleCollision
-				);
-				this.physics.collisionHandler.addCollisionHandler('wall', undefined, this.handleCollision);
-			}
-		});
+		this.removeCollisionHandlers = ['ground', 'urinal', 'wall'].map((name) =>
+			physics.collisionHandler.addCollisionHandler(name, undefined, this.handleCollision)
+		);
 	}
 
 	private handleCollision(
-		mesh1: THREE.Mesh | undefined,
-		mesh2: THREE.Mesh | undefined,
+		mesh1: THREE.Object3D | undefined,
+		mesh2: THREE.Object3D | undefined,
 		started: boolean
 	) {
 		if (!started) return;
-		let name = mesh1 ? mesh1.userData.name : mesh2?.userData.name;
-		if (name === 'urinal') {
-			gameStateStore.update((state) => {
-				state.score += 1;
-				return state;
-			});
-		}
-		if (name === 'ground' || name === 'wall') {
-			gameStateStore.update((state) => {
-				state.score -= 1;
-				return state;
-			});
-		}
+		const name = mesh1 ? mesh1.userData.name : mesh2?.userData.name;
+		const change = name === 'urinal' ? 1 : name === 'ground' || name === 'wall' ? -1 : 0;
+		if (change) gameStateStore.update((state) => ({ ...state, score: state.score + change }));
 	}
 
 	private spawnWater() {
-		if (!this.physics) return;
-
-		// Screen space mouse dir
-		const dir = new THREE.Vector3(
-			(this.mouseX / this.halfX) * 2,
-			(this.mouseY / this.halfY) * 1.5 + 1,
-			-2
-		).normalize();
+		// Screen space mouse dir; reuse the vector for every emitted droplet.
+		const dir = this.velocity
+			.set((this.mouseX / this.halfX) * 2, (this.mouseY / this.halfY) * 1.5 + 1, -2)
+			.normalize();
 
 		const speed = 15;
 		const velocity = dir.multiplyScalar(speed);
@@ -142,8 +119,8 @@ export class WaterJet {
 		this.halfY = window.innerHeight / 2;
 	}
 
-	private update(deltaTime: number) {
-		if (!this.physics) return;
+	update(deltaTime: number) {
+		if (this.disposed) return;
 
 		this.acc += deltaTime * this.emitRate;
 
@@ -164,9 +141,8 @@ export class WaterJet {
 		}
 	}
 
-	loop(deltaTime: number) {
-		if (!this.physics) return;
-		this.update(deltaTime);
+	syncInstances() {
+		if (this.disposed) return;
 
 		let index = 0;
 		for (const particle of this.particles) {
@@ -183,17 +159,18 @@ export class WaterJet {
 	}
 
 	dispose() {
+		if (this.disposed) return;
+		this.disposed = true;
+		for (const remove of this.removeCollisionHandlers) remove();
 		window.removeEventListener('pointermove', this.onPointerMove);
 		window.removeEventListener('resize', this.onWindowResize);
 
-		if (this.physics) {
-			for (const particle of this.particles) {
-				this.physics.removeParticle(particle.body);
-			}
-		}
+		for (const particle of this.particles) this.physics.removeParticle(particle.body);
 
 		this.scene.remove(this.particlesMesh);
 		this.particles.length = 0;
+		this.particlesMesh.dispose();
 		this.geometry.dispose();
+		this.material.dispose();
 	}
 }

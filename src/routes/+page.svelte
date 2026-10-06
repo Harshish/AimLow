@@ -1,31 +1,52 @@
-<script>
+<script lang="ts">
 	import { onMount } from 'svelte';
 	import App from '$lib/App';
-	import { gameStateStore, appStatusStore } from '$lib/Utils/Store';
+	import { gameStateStore } from '$lib/Utils/Store';
 
-	let score = $state($gameStateStore.score);
-	gameStateStore.subscribe((value) => {
-		score = value.score;
-	});
-
-	let started = $state($appStatusStore.started);
-	appStatusStore.subscribe((value) => {
-		started = value.started;
-	});
+	let canvas: HTMLCanvasElement;
+	let app: App | undefined;
+	let progress = $state(0);
+	let ready = $state(false);
+	let started = $state(false);
+	let error = $state('');
 
 	onMount(() => {
-		new App();
+		let active = true;
+		const initialize = async () => {
+			try {
+				app = new App(canvas);
+				await app.init((value) => {
+					if (active) progress = Math.trunc(value * 100);
+				});
+				if (active) ready = true;
+			} catch (cause) {
+				if (active) error = cause instanceof Error ? cause.message : 'Unable to start experience';
+			}
+		};
+		void initialize();
+		return () => {
+			active = false;
+			app?.dispose();
+		};
 	});
+
+	function start() {
+		app?.start();
+		started = true;
+	}
 </script>
 
-<canvas class="threejs"></canvas>
-<div class="overlay"></div>
-<h1 class="loading">
-	Loading Experience... <span id="progressPercentage"></span>%
-</h1>
-<button class="start">START</button>
+<canvas class="threejs" bind:this={canvas}></canvas>
+<div class="overlay" class:hidden={started}></div>
+{#if error}
+	<p class="loading" role="alert">{error}</p>
+{:else if !ready}
+	<h1 class="loading" aria-live="polite">Loading Experience... {progress}%</h1>
+{:else if !started}
+	<button type="button" class="start" onclick={start}>START</button>
+{/if}
 {#if started}
-	<h2 class="score">Score : {score}</h2>
+	<h2 class="score">Score : {$gameStateStore.score}</h2>
 {/if}
 
 <style>
@@ -39,6 +60,10 @@
 		left: 0px;
 		pointer-events: none;
 		transition: opacity 1s;
+	}
+
+	.overlay.hidden {
+		opacity: 0;
 	}
 
 	.loading {
@@ -63,11 +88,10 @@
 		color: white;
 		background-color: transparent;
 		font-size: 4rem;
-		opacity: 0;
+		opacity: 1;
 		font-family: 'Amatic SC';
 		transition: opacity 0.5s;
 		cursor: pointer;
-		display: none;
 	}
 
 	.score {

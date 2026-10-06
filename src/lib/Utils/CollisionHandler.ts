@@ -1,45 +1,39 @@
-import * as THREE from 'three/webgpu';
+import type { Object3D } from 'three/webgpu';
 
 type CollisionHandlerFn = (
-	meshA: THREE.Mesh | undefined,
-	meshB: THREE.Mesh | undefined,
+	objectA: Object3D | undefined,
+	objectB: Object3D | undefined,
 	started: boolean
 ) => void;
 
-type CollisionHandlerMapType = Map<string, CollisionHandlerFn>;
-
 export class CollisionHandler {
-	private collisionHandlerMap: CollisionHandlerMapType;
-
-	constructor() {
-		this.collisionHandlerMap = new Map();
-	}
+	private readonly handlers = new Map<string, CollisionHandlerFn>();
 
 	addCollisionHandler(
 		key1: string | undefined,
 		key2: string | undefined,
 		handler: CollisionHandlerFn
 	) {
-		if (!key1 && !key2) return;
-		const keys = this.resolveKeyOrder(key1, key2);
-		if (!keys) return;
-		this.collisionHandlerMap.set(keys, handler);
+		const key = this.resolveKeyOrder(key1, key2);
+		if (!key) return () => {};
+		this.handlers.set(key, handler);
+		return () => {
+			if (this.handlers.get(key) === handler) this.handlers.delete(key);
+		};
 	}
 
 	resolveKeyOrder(key1: string | undefined, key2: string | undefined): string | null {
 		if (!key1 && !key2) return null;
-		if (!key1) key1 = '';
-		if (!key2) key2 = '';
-		return key1 < key2 ? `${key1}:${key2}` : `${key2}:${key1}`;
+		// JSON encoding avoids collisions when a name itself contains ':'.
+		return JSON.stringify([key1 ?? '', key2 ?? ''].sort());
 	}
 
-	resolveCollision(mesh1: THREE.Mesh | undefined, mesh2: THREE.Mesh | undefined, started: boolean) {
-		const name1 = mesh1?.userData.name;
-		const name2 = mesh2?.userData.name;
-		const keys = this.resolveKeyOrder(name1, name2);
-		if (!keys) return;
-		const handler = this.collisionHandlerMap.get(keys);
-		if (!handler) return;
-		handler(mesh1, mesh2, started);
+	resolveCollision(object1: Object3D | undefined, object2: Object3D | undefined, started: boolean) {
+		const key = this.resolveKeyOrder(object1?.userData.name, object2?.userData.name);
+		if (key) this.handlers.get(key)?.(object1, object2, started);
+	}
+
+	clear() {
+		this.handlers.clear();
 	}
 }

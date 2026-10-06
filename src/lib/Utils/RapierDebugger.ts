@@ -1,11 +1,7 @@
 import * as THREE from 'three/webgpu';
-import * as RAPIER from '@dimforge/rapier3d-compat';
-import App from '../App';
-import { appStateStore } from '$lib/Utils/Store';
+import type * as RAPIER from '@dimforge/rapier3d-compat';
 
 export default class RapierDebugger {
-	app: App;
-	world!: RAPIER.World;
 	mesh: THREE.LineSegments;
 
 	// Pre-allocated attributes and tracking capacity
@@ -13,9 +9,11 @@ export default class RapierDebugger {
 	private colorAttribute: THREE.BufferAttribute;
 	private maxCapacity: number = 0;
 
-	constructor(initialCapacity = 10000) {
-		this.app = new App();
-
+	constructor(
+		private readonly scene: THREE.Scene,
+		private readonly world: RAPIER.World,
+		initialCapacity = 10000
+	) {
 		const geometry = new THREE.BufferGeometry();
 
 		// Initialize buffers with an estimated maximum capacity
@@ -36,18 +34,10 @@ export default class RapierDebugger {
 		this.mesh.frustumCulled = false;
 		this.mesh.visible = false;
 
-		this.app.scene.add(this.mesh);
-
-		appStateStore.subscribe((state) => {
-			if (state.physicsReady) {
-				this.world = this.app.world.physics.world;
-			}
-		});
+		this.scene.add(this.mesh);
 	}
 
 	loop() {
-		if (!this.world) return;
-
 		const { vertices, colors } = this.world.debugRender();
 		const pointCount = vertices.length / 3;
 
@@ -86,6 +76,6 @@ export default class RapierDebugger {
 	destroy() {
 		this.mesh.geometry.dispose();
 		(this.mesh.material as THREE.Material).dispose();
-		this.app.scene.remove(this.mesh);
+		this.scene.remove(this.mesh);
 	}
 }

@@ -1,30 +1,19 @@
 import * as THREE from 'three/webgpu';
 
-import App from '../App';
-import Physics from './Physics';
-import { assetStore } from '$lib/Utils/AssetStore';
-import { get } from 'svelte/store';
-import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type Physics from './Physics';
+import type { LoadedAssets } from '../Utils/Assets';
 import { Wasp } from './Elements/Wasp';
 import { Spider } from './Elements/Spider';
 
 // Used for addding Lights to our scene
 export default class Environment {
-	app: App;
-	scene!: THREE.Scene;
-	directionalLight!: THREE.DirectionalLight;
-	physics!: Physics;
 	groundMesh!: THREE.Mesh;
-	constructor() {
-		this.app = new App();
-		this.scene = this.app?.scene;
-		this.physics = this.app?.world?.physics;
-
-		assetStore.subscribe((state) => {
-			if (state.ready) {
-				this.loadEnvironment();
-			}
-		});
+	constructor(
+		private readonly scene: THREE.Scene,
+		private readonly physics: Physics,
+		private readonly assets: LoadedAssets
+	) {
+		this.loadEnvironment();
 	}
 
 	addLights() {
@@ -58,7 +47,7 @@ export default class Environment {
 	}
 
 	addUrinal() {
-		const gltfAsset = get(assetStore).loadedAssets['urinal'] as GLTF;
+		const gltfAsset = this.assets.urinal;
 		const urinal = gltfAsset.scene;
 		urinal.scale.set(12, 12, 12);
 		urinal.position.set(0, 0, 2);
@@ -76,18 +65,17 @@ export default class Environment {
 	}
 
 	loadEnvironment() {
-		if (!this.scene) return;
 		this.addLights();
 		this.addUrinal();
 		this.addGround();
 		this.addWall();
 
-		new Wasp();
-		new Spider();
+		new Wasp(this.scene, this.physics, this.assets.wasp);
+		new Spider(this.scene, this.physics, this.assets.spider);
 	}
 
 	addGround() {
-		const texture = get(assetStore).loadedAssets['floor'] as THREE.Texture;
+		const texture = this.assets.floor;
 		texture.colorSpace = THREE.SRGBColorSpace;
 		texture.wrapS = THREE.RepeatWrapping;
 		texture.wrapT = THREE.RepeatWrapping;
@@ -113,7 +101,7 @@ export default class Environment {
 	}
 
 	addWall() {
-		const texture = get(assetStore).loadedAssets['wall'] as THREE.Texture;
+		const texture = this.assets.wall;
 		texture.wrapS = THREE.RepeatWrapping;
 		texture.wrapT = THREE.RepeatWrapping;
 		texture.repeat.set(6, 6);
@@ -124,7 +112,7 @@ export default class Environment {
 			metalness: 0
 		});
 
-		const graffiti_texture = get(assetStore).loadedAssets['graffiti'] as THREE.Texture;
+		const graffiti_texture = this.assets.graffiti;
 		graffiti_texture.colorSpace = THREE.SRGBColorSpace;
 
 		const material2 = new THREE.MeshBasicMaterial({

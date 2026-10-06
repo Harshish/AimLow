@@ -1,13 +1,13 @@
 import * as THREE from 'three/webgpu';
-import App from '../App.js';
-import RAPIER from '@dimforge/rapier3d-compat';
-import Physics from './Physics';
+import type RAPIER from '@dimforge/rapier3d-compat';
+import type Physics from './Physics';
 
 import { inputStore } from '../Utils/Store.ts';
 
 export default class Character {
-	app: App;
-	scene: THREE.Scene;
+	private readonly unsubscribe: () => void;
+	private readonly movement = new THREE.Vector3();
+	private readonly nextPosition = new THREE.Vector3();
 	character!: THREE.Mesh;
 	forward: boolean = false;
 	backward: boolean = false;
@@ -19,13 +19,11 @@ export default class Character {
 	colliderType!: RAPIER.ColliderDesc;
 	collider!: RAPIER.Collider;
 	characterController!: RAPIER.KinematicCharacterController;
-	physics: Physics;
-	constructor() {
-		this.app = new App();
-		this.scene = this.app.scene;
-		this.physics = this.app.world.physics;
-
-		inputStore.subscribe((state) => {
+	constructor(
+		private readonly scene: THREE.Scene,
+		private readonly physics: Physics
+	) {
+		this.unsubscribe = inputStore.subscribe((state) => {
 			this.forward = state.forward;
 			this.backward = state.backward;
 			this.left = state.left;
@@ -59,10 +57,13 @@ export default class Character {
 		this.rigidBody.setRotation(worldRotation, true);
 
 		this.characterController = this.physics.world.createCharacterController(0.01);
+		this.characterController.setApplyImpulsesToDynamicBodies(true);
+		this.characterController.enableAutostep(3, 0.1, true);
+		this.characterController.enableSnapToGround(1);
 	}
 
 	loop(deltaTime: number) {
-		const movement = new THREE.Vector3();
+		const movement = this.movement.set(0, 0, 0);
 
 		if (this.forward) {
 			movement.z -= 1;
@@ -80,16 +81,22 @@ export default class Character {
 		movement.normalize().multiplyScalar(deltaTime * 30);
 		movement.y = -1;
 		this.characterController.computeColliderMovement(this.collider, movement);
-		this.characterController.setApplyImpulsesToDynamicBodies(true);
-		this.characterController.enableAutostep(3, 0.1, true);
-		this.characterController.enableSnapToGround(1);
 
-		const newPosition = new THREE.Vector3()
+		const newPosition = this.nextPosition
 			.copy(this.rigidBody.translation())
 			.add(this.characterController.computedMovement());
 
 		this.rigidBody.setNextKinematicTranslation(newPosition);
 
 		this.character.position.copy(this.rigidBody.translation());
+	}
+
+	dispose() {
+		this.unsubscribe();
+		this.physics.world.removeCharacterController(this.characterController);
+		this.physics.world.removeRigidBody(this.rigidBody);
+		this.scene.remove(this.character);
+		this.character.geometry.dispose();
+		(this.character.material as THREE.Material).dispose();
 	}
 }

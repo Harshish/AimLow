@@ -1,42 +1,33 @@
 import * as THREE from 'three/webgpu';
-import App from '../App';
-import RAPIER_TYPE from '@dimforge/rapier3d-compat';
-import { appStateStore } from '$lib/Utils/Store';
-import { CollisionHandler } from '$lib/Utils/CollisionHandler';
+import type RAPIER_TYPE from '@dimforge/rapier3d-compat';
+import { CollisionHandler } from '../Utils/CollisionHandler';
 
 type RigidBodyType = 'fixed' | 'dynamic' | 'kinematic' | 'kinematicPosition';
 type ColliderType = 'cuboid' | 'ball' | 'trimesh';
 
 export default class Physics {
-	app: App;
-	scene: THREE.Scene;
-	world!: RAPIER_TYPE.World;
-	rapierLoaded = false;
-	rapier!: typeof RAPIER_TYPE;
-	meshMap!: Map<THREE.Object3D, RAPIER_TYPE.RigidBody>;
-	eventQueue!: RAPIER_TYPE.EventQueue;
-	colliderMap!: Map<number, THREE.Object3D>;
-	collisionHandler: CollisionHandler;
+	readonly world: RAPIER_TYPE.World;
+	readonly meshMap = new Map<THREE.Object3D, RAPIER_TYPE.RigidBody>();
+	readonly eventQueue: RAPIER_TYPE.EventQueue;
+	readonly colliderMap = new Map<number, THREE.Object3D>();
+	readonly collisionHandler = new CollisionHandler();
+	private readonly position = new THREE.Vector3();
+	private readonly quaternion = new THREE.Quaternion();
+	private readonly parentQuaternion = new THREE.Quaternion();
+	private disposed = false;
+	private static initialization: Promise<void> | undefined;
 	private static readonly GROUP_PARTICLE = 1 << 3;
 	private static readonly GROUP_WORLD = 1 << 0;
 
-	constructor() {
-		this.app = new App();
-		this.scene = this.app.scene;
-		this.meshMap = new Map();
-		this.colliderMap = new Map<number, THREE.Mesh>();
-		this.collisionHandler = new CollisionHandler();
+	private constructor(readonly rapier: typeof RAPIER_TYPE) {
+		this.world = new rapier.World({ x: 0, y: -9.81, z: 0 });
+		this.eventQueue = new rapier.EventQueue(true);
+	}
 
-		import('@dimforge/rapier3d-compat').then(async (module) => {
-			const RAPIER = module.default;
-			await RAPIER.init();
-			const gravity = { x: 0, y: -9.81, z: 0 };
-			this.world = new RAPIER.World(gravity);
-			this.rapier = RAPIER;
-			this.rapierLoaded = true;
-			this.eventQueue = new RAPIER.EventQueue(true);
-			appStateStore.set({ physicsReady: true });
-		});
+	static async create() {
+		const { default: rapier } = await import('@dimforge/rapier3d-compat');
+		await (Physics.initialization ??= rapier.init());
+		return new Physics(rapier);
 	}
 
 	addParticle(x: number, y: number, z: number, velocity: THREE.Vector3): RAPIER_TYPE.RigidBody {
@@ -86,13 +77,10 @@ export default class Physics {
 				break;
 		}
 
-		// Create Physics Wolrld Object
-		let rigidBody = this.world.createRigidBody(rigidBodyType);
-
-		// Define Collider Type
+		// Validate collider geometry before allocating a body in the physics world.
 		let colliderType;
 		switch (collider) {
-			case 'cuboid':
+			case 'cuboid': {
 				if (!(mesh as THREE.Mesh).isMesh) {
 					throw new Error('Mesh is not a THREE.Mesh');
 				}
@@ -103,25 +91,27 @@ export default class Physics {
 					diemensions.z / 2
 				);
 				break;
+			}
 			case 'ball':
 				if ((mesh as THREE.Mesh).isMesh) {
 					const radius = this.computeBallDimensions(mesh as THREE.Mesh);
 					colliderType = this.rapier.ColliderDesc.ball(radius);
 				} else {
-					colliderType = this.rapier.ColliderDesc.ball(size || 0.35);
+					colliderType = this.rapier.ColliderDesc.ball(size ?? 0.35);
 				}
 				break;
-			case 'trimesh':
+			case 'trimesh': {
 				if (!(mesh as THREE.Mesh).isMesh) {
 					throw new Error('Mesh is not a THREE.Mesh');
 				}
 				const { scaledVertices, indices } = this.computeTrimeshDimensions(mesh as THREE.Mesh);
 				colliderType = this.rapier.ColliderDesc.trimesh(scaledVertices, indices);
 				break;
+			}
 		}
 
 		if (collision) {
-			colliderType.setActiveEvents(RAPIER_TYPE.ActiveEvents.COLLISION_EVENTS);
+			colliderType.setActiveEvents(this.rapier.ActiveEvents.COLLISION_EVENTS);
 			colliderType.setCollisionGroups((Physics.GROUP_WORLD << 16) | Physics.GROUP_PARTICLE);
 		}
 
@@ -132,11 +122,13 @@ export default class Physics {
 			const colliderOffset = offset.clone();
 			colliderType.setTranslation(colliderOffset.x, colliderOffset.y, colliderOffset.z);
 		}
+		const rigidBody = this.world.createRigidBody(rigidBodyType);
 		const colliderDesc = this.world.createCollider(colliderType, rigidBody);
 
 		rigidBody.setTranslation(worldPosition, false);
 		rigidBody.setRotation(worldRotation, false);
-		this.meshMap.set(mesh, rigidBody);
+		// Static level geometry never needs a physics-to-render transform update.
+		if (type !== 'fixed') this.meshMap.set(mesh, rigidBody);
 		this.colliderMap.set(colliderDesc.handle, mesh);
 
 		return rigidBody;
@@ -194,9 +186,8 @@ export default class Physics {
 	}
 
 	loop(deltaTime: number) {
-		if (!this.rapierLoaded) return;
-
-		this.world.timestep = Math.min(deltaTime, 0.1);
+		if (this.disposed) return;
+		this.world.timestep = deltaTime;
 		this.world.step(this.eventQueue);
 
 		this.eventQueue.drainCollisionEvents((handle1, handle2, started) => {
@@ -213,14 +204,13 @@ export default class Physics {
 			const translation = rigidBody.translation();
 			const rotation = rigidBody.rotation();
 
-			const position = new THREE.Vector3(translation.x, translation.y, translation.z);
-
-			const quaternion = new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
+			const position = this.position.set(translation.x, translation.y, translation.z);
+			const quaternion = this.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
 
 			if (mesh.parent) {
 				mesh.parent.worldToLocal(position);
 
-				const parentQuaternion = new THREE.Quaternion();
+				const parentQuaternion = this.parentQuaternion;
 				mesh.parent.getWorldQuaternion(parentQuaternion);
 
 				parentQuaternion.invert();
@@ -230,5 +220,15 @@ export default class Physics {
 			mesh.position.copy(position);
 			mesh.quaternion.copy(quaternion);
 		});
+	}
+
+	dispose() {
+		if (this.disposed) return;
+		this.disposed = true;
+		this.collisionHandler.clear();
+		this.meshMap.clear();
+		this.colliderMap.clear();
+		this.eventQueue.free();
+		this.world.free();
 	}
 }

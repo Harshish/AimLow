@@ -1,39 +1,29 @@
-import App from '../App';
-import Camera from '../Camera';
-import Renderer from '../Renderer';
-import World from '../World/World';
-import * as THREE from 'three/webgpu';
-import RapierDebugger from './RapierDebugger';
-
 export default class Loop {
-	app: App;
-	camera: Camera;
-	renderer: Renderer;
-	world: World;
-	timer: THREE.Timer;
-	debugger?: RapierDebugger;
-	constructor() {
-		console.log('Loop Init');
-		this.app = new App();
-		this.camera = this.app.camera;
-		this.renderer = this.app.renderer;
-		this.world = this.app.world;
+	private frame: number | undefined;
+	private previousTime: number | undefined;
+	private readonly update: (deltaTime: number) => void;
 
-		//this.debugger = new RapierDebugger();
-
-		this.timer = new THREE.Timer();
-		this.loop();
+	constructor(update: (deltaTime: number) => void) {
+		this.update = update;
 	}
 
-	loop() {
-		this.timer.update();
-		const elapsedTime = this.timer.getElapsed();
-		const deltaTime = this.timer.getDelta();
+	start() {
+		if (this.frame !== undefined) return;
+		this.previousTime = undefined;
+		this.frame = requestAnimationFrame(this.tick);
+	}
 
-		this.world.loop(deltaTime, elapsedTime);
-		this.camera.loop();
-		this.renderer.loop();
-		this.debugger?.loop();
-		window.requestAnimationFrame(() => this.loop());
+	private tick = (time: number) => {
+		const delta = this.previousTime === undefined ? 0 : (time - this.previousTime) / 1000;
+		this.previousTime = time;
+		// Bound catch-up after background tabs and slow frames.
+		this.update(Math.max(0, Math.min(delta, 0.1)));
+		if (this.frame !== undefined) this.frame = requestAnimationFrame(this.tick);
+	};
+
+	dispose() {
+		if (this.frame !== undefined) cancelAnimationFrame(this.frame);
+		this.frame = undefined;
+		this.previousTime = undefined;
 	}
 }

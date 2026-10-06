@@ -1,44 +1,36 @@
 import * as THREE from 'three/webgpu';
-import App from '../App';
-import Physics from './Physics';
+import type Physics from './Physics';
 import Environment from './Environment';
-import { appStateStore } from '$lib/Utils/Store';
-import { appStatusStore } from '../Utils/Store';
-import { WaterJet } from '$lib/World/Elements/WaterJet';
+import type { LoadedAssets } from '../Utils/Assets';
+import { WaterJet } from './Elements/WaterJet';
 
 export default class World {
-	app: App;
-	scene: THREE.Scene;
-	physics: Physics;
-	environment!: Environment;
-	appStarted: boolean = false;
-	waterJet: WaterJet;
-	constructor() {
-		console.log('World Init');
-		this.app = new App();
-		this.scene = this.app.scene;
+	started = false;
+	private readonly waterJet: WaterJet;
 
-		this.physics = new Physics();
-
-		appStateStore.subscribe((state) => {
-			if (state.physicsReady) {
-				this.environment = new Environment();
-			}
-		});
-
-		appStatusStore.subscribe((state) => {
-			this.appStarted = state.started;
-		});
-
-		const hosePos = new THREE.Vector3(0, 10, 17);
-		this.waterJet = new WaterJet(hosePos);
-
-		this.loop(0, 0);
+	constructor(
+		scene: THREE.Scene,
+		private readonly physics: Physics,
+		assets: LoadedAssets
+	) {
+		new Environment(scene, physics, assets);
+		this.waterJet = new WaterJet(scene, physics, new THREE.Vector3(0, 10, 17));
 	}
 
-	loop(deltaTime: number, elapsedTime: number) {
-		if (!this.appStarted) return;
-		this.waterJet.loop(deltaTime);
-		this.physics.loop(deltaTime);
+	private step = (timestep: number) => {
+		this.waterJet.update(timestep);
+		this.physics.loop(timestep);
+	};
+
+	loop(deltaTime: number) {
+		if (!this.started) return;
+		// One Rapier step per rendered frame. Loop bounds stalls without fixing the rate.
+		if (Number.isFinite(deltaTime) && deltaTime > 0) this.step(deltaTime);
+		// Upload once per render, after the simulation step.
+		this.waterJet.syncInstances();
+	}
+
+	dispose() {
+		this.waterJet.dispose();
 	}
 }
