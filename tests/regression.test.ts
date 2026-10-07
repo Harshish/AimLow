@@ -31,9 +31,12 @@ import {
 	DEFAULT_SETTINGS,
 	AIM_LIMIT_X,
 	KEYBOARD_AIM_SPEED,
-	LATE_WAVE_DRAIN,
+	WAVE_PRESSURE_DRAIN,
+	waveProfile,
 	DAMAGE_PER_FLOW,
 	FLOW_RATE,
+	MAX_FLOW_RATE,
+	PARTICLE_LIFE,
 	type DrinkKind
 } from '../src/lib/Game/config';
 import {
@@ -194,6 +197,24 @@ test('all stream profiles use blue or cyan rather than yellow', () => {
 	}
 });
 
+test('Cola is faster, denser, and more precise than normal flow even at low pressure', () => {
+	for (const pressure of [1, 5, 20, 100]) {
+		const normal = jetProfile(pressure, null);
+		const cola = jetProfile(pressure, 'cola');
+		const beer = jetProfile(pressure, 'beer');
+		assert.equal(cola.speed, normal.speed * 1.6);
+		assert.equal(cola.emission, normal.emission * 1.5);
+		assert.ok(cola.spread < normal.spread);
+		assert.equal(beer.emission, normal.emission * 1.25);
+		assert.ok(cola.emission <= MAX_FLOW_RATE);
+	}
+	for (const drink of [null, 'beer', 'cola'] as const) {
+		assert.equal(jetProfile(0, drink).emission, 0);
+		assert.equal(jetProfile(0, drink).speed, 0);
+	}
+	assert.ok(WAVE_BREAK > BOWL_STREAK_SECONDS + 0.5, 'breaks allow travel time and a bowl reward');
+});
+
 test('round rules freeze, drain consistently, and finalize exactly once', () => {
 	for (const fps of [30, 60, 120]) {
 		const session = new Session();
@@ -247,7 +268,7 @@ test('combat hits count toward accuracy without double-awarding score', () => {
 	assert.equal(session.state.result!.accuracy, 1, 'combat-only hits are accurate too');
 });
 
-test('late waves increase pressure drain gradually without changing early waves', () => {
+test('each wave ramps spawn pace, health, and pressure without removing reaction windows', () => {
 	const drain = (wave: number) => {
 		const session = new Session();
 		session.start();
@@ -257,9 +278,19 @@ test('late waves increase pressure drain gradually without changing early waves'
 		return 100 - session.state.pressure;
 	};
 	assert.equal(drain(1), 1.25);
-	assert.equal(drain(8), 1.25);
-	assert.ok(Math.abs(drain(9) - (1.25 + LATE_WAVE_DRAIN)) < 1e-8);
-	assert.ok(drain(16) > drain(9));
+	assert.equal(drain(0), drain(1));
+	for (let wave = 2; wave <= 30; wave++) {
+		const previous = waveProfile(wave - 1),
+			current = waveProfile(wave);
+		assert.ok(Math.abs(drain(wave) - drain(wave - 1) - WAVE_PRESSURE_DRAIN) < 1e-8);
+		assert.ok(current.spawnInterval <= previous.spawnInterval);
+		assert.ok(current.spawnInterval >= MIN_SPAWN_INTERVAL);
+		assert.ok(current.healthMultiplier >= previous.healthMultiplier);
+		assert.ok(current.healthMultiplier <= 1.8);
+		assert.ok(current.waspHover <= previous.waspHover && current.waspHover >= 0.7);
+	}
+	assert.equal(waveProfile(30).spawnInterval, MIN_SPAWN_INTERVAL);
+	assert.equal(waveProfile(1).healthMultiplier, 1);
 	for (const pressure of [1, 5, 10]) {
 		assert.ok(jetProfile(pressure, null).emission >= 150 * 0.7);
 		assert.ok(jetProfile(pressure, null).speed >= 24 * 0.85);
@@ -464,7 +495,7 @@ test('real world bowl contacts charge a streak reward without collectible cans',
 	}
 });
 
-test('stage lighting uses three distinct, targeted spotlights and softer ambient light', async () => {
+test('colored spotlights stay high above the arena without visible beams or fixtures', async () => {
 	const scene = new THREE.Scene();
 	const physics = await Physics.create();
 	const assets = {
@@ -481,11 +512,22 @@ test('stage lighting uses three distinct, targeted spotlights and softer ambient
 		assert.equal(new Set(spots.map((spot) => spot.color.getHex())).size, 3);
 		for (const spot of spots) {
 			assert.equal(spot.target.parent, scene);
+			assert.ok(spot.position.y >= 40, 'spotlights sit far above the arena');
 			assert.ok(spot.position.y > spot.target.position.y);
+			const distance = spot.position.distanceTo(spot.target.position);
+			assert.ok(spot.distance > distance, 'raised lights still reach the bowl');
+			assert.ok(spot.intensity / distance ** 2 > 2, 'falloff does not wash out the colors');
 			assert.ok(spot.penumbra > 0.5);
+			assert.equal(spot.castShadow, false, 'no extra shadow passes');
 		}
+		assert.equal(scene.getObjectByName('stage-light-beam'), undefined);
+		assert.equal(
+			scene.children.filter((child) => child instanceof THREE.Mesh).length,
+			3,
+			'only the aiming ring, floor, and wall add visible geometry'
+		);
 		const ambient = scene.children.find((child) => child instanceof THREE.HemisphereLight)!;
-		assert.ok((ambient as THREE.HemisphereLight).intensity < 1.5);
+		assert.ok((ambient as THREE.HemisphereLight).intensity < 1);
 	} finally {
 		physics.dispose();
 		disposeResources([scene, assets.floor, assets.wall]);
@@ -608,6 +650,14 @@ test('droplets resolve once, ignore shell contacts, and release all physics iden
 			jet.reset();
 			jet.update(STEP, new THREE.Vector3(0, 6, 5.5), jetProfile(100, null));
 		}
+		jet.reset();
+		for (let i = 0; i < 210; i++) {
+			jet.update(STEP, new THREE.Vector3(0, 6, 5.5), jetProfile(100, 'cola'));
+			jet.resolve([], () => false);
+		}
+		jet.syncInstances();
+		assert.ok(jet.particles.size > FLOW_RATE * PARTICLE_LIFE, 'boosted flow exceeds old capacity');
+		assert.ok(jet.particlesMesh.count <= jet.particlesMesh.instanceMatrix.count);
 		jet.dispose();
 		jet.dispose();
 		physics.removeBody(sensor);
@@ -695,25 +745,29 @@ test('jet captures the inner bowl at varied angles and rescues low pressure in e
 	);
 	const assets = { urinal, spider, wasp, floor: new THREE.Texture(), wall: new THREE.Texture() };
 	try {
-		const cases: [number, number, DrinkKind | null][] = ENEMY_LANES.map((_, lane) => [
-			lane,
-			5,
-			null
-		]);
-		for (const drink of [null, 'beer', 'cola'] as const) cases.push([5, 100, drink]);
-		for (const [lane, pressure, drink] of cases) {
+		const cases: [number, number, DrinkKind | null, number, number?][] = ENEMY_LANES.map(
+			(_, lane) => [lane, 5, null, 1]
+		);
+		for (const drink of [null, 'beer', 'cola'] as const) cases.push([5, 100, drink, 1]);
+		for (let lane = 0; lane < ENEMY_LANES.length; lane++) {
+			cases.push([lane, 5, null, 13], [lane, 5, 'cola', 13]);
+		}
+		cases.push([0, 20, null, 13, 3], [1, 20, null, 13, 3]);
+		const killTimes = new Map<DrinkKind | null, number>();
+		for (const [lane, pressure, drink, wave, id = 1] of cases) {
 			seed = 42;
 			const scene = new THREE.Scene();
 			const physics = await Physics.create();
 			new Environment(scene, physics, assets);
 			const session = new Session();
 			const kind = ENEMY_LANES[lane].kind;
-			const enemy = new Enemy(1, kind, assets[kind], scene, physics, lane);
+			const enemy = new Enemy(id, kind, assets[kind], scene, physics, lane, wave);
 			const jet = new WaterJet(scene, physics);
 			try {
 				session.start();
 				session.tick(3);
 				session.state.pressure = pressure;
+				session.state.wave = wave;
 				while (session.playing && enemy.status !== 'dead' && session.state.elapsed < 3.5) {
 					enemy.update(STEP, false);
 					jet.update(STEP, enemy.root.position, jetProfile(session.state.pressure, drink));
@@ -728,9 +782,12 @@ test('jet captures the inner bowl at varied angles and rescues low pressure in e
 				assert.equal(
 					enemy.status,
 					'dead',
-					`lane ${lane}, pressure ${pressure}, drink ${drink} stays hittable`
+					`lane ${lane}, pressure ${pressure}, drink ${drink}, wave ${wave} stays hittable`
 				);
 				assert.equal(session.state.kills, 1);
+				assert.ok(enemy.remaining > 0, 'kill beats the escape timer, including drop landing time');
+				if (lane === 5 && pressure === 100 && wave === 1)
+					killTimes.set(drink, session.state.elapsed);
 				assert.ok(session.state.targeted > 0, 'combat hits improve accuracy');
 				if (pressure === 5) assert.ok(session.state.pressure > 5, 'a timely kill rescues the tank');
 			} finally {
@@ -741,6 +798,10 @@ test('jet captures the inner bowl at varied angles and rescues low pressure in e
 				disposeResources([scene]);
 			}
 		}
+		assert.ok(
+			killTimes.get('cola')! < killTimes.get(null)! * 0.85,
+			'Cola kills moving targets noticeably faster'
+		);
 		for (const drink of [null, 'beer', 'cola'] as const) {
 			seed = 42;
 			const scene = new THREE.Scene();
@@ -758,7 +819,7 @@ test('jet captures the inner bowl at varied angles and rescues low pressure in e
 					captured += jet.resolve(physics.loop(STEP), () => false).captured;
 				}
 				assert.ok(
-					captured > (drink === 'beer' ? 1.8 : 2.7),
+					captured > (drink === 'beer' ? 2.4 : drink === 'cola' ? 4.2 : 2.7),
 					`${drink}: faster stream still lands in the basin (${captured}/3)`
 				);
 			} finally {
@@ -841,6 +902,77 @@ test('bugs move quickly, have short reaction windows, and need only a brief burs
 	}
 });
 
+test('late-wave wasps pause then dart smoothly and falling spiders get time to land', async (t) => {
+	t.mock.method(Math, 'random', () => 0);
+	const scene = new THREE.Scene();
+	const physics = await Physics.create();
+	const bug = model();
+	bug.scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial()));
+	const wasp = new Enemy(1, 'wasp', bug, scene, physics, 2, 13);
+	const drop = new Enemy(3, 'spider', bug, scene, physics, 0, 7);
+	const depth = new Enemy(1, 'spider', bug, scene, physics, 1, 4);
+	const advance = (enemy: Enemy, dt: number) => {
+		enemy.update(dt, true);
+		physics.loop(STEP);
+	};
+	try {
+		assert.equal(wasp.pattern, 'dart');
+		advance(wasp, 0.3);
+		const perch = wasp.root.position.clone();
+		advance(wasp, waveProfile(13).waspHover);
+		assert.ok(
+			wasp.root.position.distanceTo(perch) < 1e-6,
+			'holds still for a readable shot window'
+		);
+		for (let frame = 0; frame < 27; frame++) {
+			const previous = wasp.root.position.clone();
+			advance(wasp, STEP);
+			assert.ok(
+				wasp.root.position.distanceTo(previous) < 0.1,
+				'darts move continuously, never teleport'
+			);
+		}
+		const nextPerch = wasp.root.position.clone();
+		assert.ok(nextPerch.distanceTo(perch) > 0.5);
+		advance(wasp, 0.2);
+		assert.ok(wasp.root.position.distanceTo(nextPerch) < 1e-6, 'holds at the next perch');
+
+		assert.equal(drop.pattern, 'drop');
+		const ceiling = drop.root.position.y;
+		advance(drop, 0.3);
+		assert.equal(drop.active, true);
+		assert.equal(drop.damage(0.3), true, 'airborne spider can be shot');
+		advance(drop, 0.625);
+		assert.ok(drop.root.position.y < ceiling - 3 && drop.dropping);
+		assert.equal(
+			drop.remaining,
+			BUGS.spider.deadline,
+			'falling does not consume the ground escape window'
+		);
+		advance(drop, 0.625);
+		assert.equal(drop.dropping, false);
+		assert.equal(drop.remaining, BUGS.spider.deadline);
+		const landed = drop.root.position.clone();
+		advance(drop, 0.5);
+		assert.ok(drop.root.position.distanceTo(landed) > 0.2, 'crawls after landing');
+		assert.ok(Math.abs(drop.root.position.y - landed.y) < 1e-6, 'does not sink through the floor');
+		assert.equal(drop.remaining, BUGS.spider.deadline - 0.5);
+
+		assert.equal(depth.pattern, 'depth');
+		advance(depth, 0.3);
+		const start = depth.root.position.clone();
+		advance(depth, 1);
+		assert.equal(depth.root.position.x, start.x);
+		assert.ok(depth.root.position.z > start.z + 0.7, 'depth crawler travels along Z');
+	} finally {
+		wasp.dispose();
+		drop.dispose();
+		depth.dispose();
+		physics.dispose();
+		disposeResources([bug.scene]);
+	}
+});
+
 test('enemies clone independently, reward final-tick kills once, and penalize timeouts once', async () => {
 	const scene = new THREE.Scene(),
 		physics = await Physics.create(),
@@ -856,10 +988,10 @@ test('enemies clone independently, reward final-tick kills once, and penalize ti
 	try {
 		session.start();
 		session.tick(3);
-		session.tick(3);
+		session.tick(WAVE_BREAK);
 		manager.update(0.3, false);
 		const spider = manager.enemies.get(1)!;
-		assert.ok(spider, 'first bug arrives after three seconds');
+		assert.ok(spider, 'first bug arrives after the opening break');
 		session.tick(4);
 		manager.update(0.3, false);
 		const wasp = manager.enemies.get(2)!;
@@ -938,6 +1070,16 @@ test('waves grow, vary spawn lanes, wait between waves, and reset cleanly', asyn
 						state.elapsed - lastSpawnAt >= MIN_SPAWN_INTERVAL - 1e-6,
 						'waves leave time to aim'
 					);
+					assert.equal(
+						enemy.maxHealth,
+						BUGS[enemy.kind].health * waveProfile(state.wave).healthMultiplier
+					);
+					if (counts.has(state.wave)) {
+						assert.ok(
+							state.elapsed - lastSpawnAt >= waveProfile(state.wave).spawnInterval - 1e-6,
+							'spawn cadence respects the wave, delaying when a drop reserves the airspace'
+						);
+					}
 					lastSpawnAt = state.elapsed;
 					seen.add(enemy.id);
 					lanes.add(enemy.lane);
@@ -949,6 +1091,17 @@ test('waves grow, vary spawn lanes, wait between waves, and reset cleanly', asyn
 				}
 			}
 			manager.resolveDeadlines();
+			for (const drop of manager.enemies.values()) {
+				if (!drop.dropping) continue;
+				assert.ok(
+					![...manager.enemies.values()].some(
+						(enemy) =>
+							enemy.kind === 'wasp' &&
+							Math.sign(ENEMY_LANES[enemy.lane].x) === Math.sign(ENEMY_LANES[drop.lane].x)
+					),
+					'falling spiders reserve their side until landing'
+				);
+			}
 			assert.equal(state.waveRemaining, waveTotal - (state.kills + state.missed - resolvedAtStart));
 			assert.ok(manager.enemies.size <= MAX_ACTIVE_ENEMIES);
 			assert.equal(
@@ -1046,8 +1199,9 @@ test('busy waves cap simultaneous bugs and keep occupied lanes exclusive', async
 	}
 });
 
-test('larger animated bugs fit every spawn lane on desktop and portrait screens', async (t) => {
+test('all movement patterns stay framed, face correctly, and remain reachable by screen aim', async (t) => {
 	mockGlobal(t, 'window', browserWindow());
+	mockGlobal(t, 'document', new EventTarget());
 	const camera = new Camera();
 	const loader = new GLTFLoader();
 	loader.register((parser) => {
@@ -1065,21 +1219,53 @@ test('larger animated bugs fit every spawn lane on desktop and portrait screens'
 	);
 	const scene = new THREE.Scene();
 	const physics = await Physics.create();
+	const manager = new EnemyManager(
+		scene,
+		physics,
+		{ spider: assets[0], wasp: assets[1] } as LoadedAssets,
+		new Session()
+	);
+	const canvas = Object.assign(new EventTarget(), {
+		getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 })
+	}) as unknown as HTMLCanvasElement;
+	const input = new InputController(
+		canvas,
+		camera.instance,
+		() => true,
+		() => {},
+		() => {}
+	);
 	try {
-		for (const random of [0, 0.75]) {
+		for (const [random, wave, id] of [0, 0.75].flatMap((random) => [
+			[random, 1, 2],
+			[random, 4, 1],
+			[random, 7, 3],
+			[random, 13, 1],
+			[random, 13, 3]
+		])) {
 			t.mock.method(Math, 'random', () => random);
 			for (let lane = 0; lane < ENEMY_LANES.length; lane++) {
 				const kind = ENEMY_LANES[lane].kind;
 				const enemy = new Enemy(
-					lane,
+					id,
 					kind,
 					assets[kind === 'spider' ? 0 : 1],
 					scene,
 					physics,
-					lane
+					lane,
+					wave
 				);
+				manager.enemies.set(id, enemy);
 				try {
+					if (kind === 'wasp') {
+						const head = enemy.root.getObjectByName('Head')!.getWorldPosition(new THREE.Vector3());
+						const thorax = enemy.root
+							.getObjectByName('Thorax')!
+							.getWorldPosition(new THREE.Vector3());
+						assert.ok(head.z > thorax.z, `wasp lane ${lane} spawns facing the player`);
+					}
 					for (let frame = 0; frame < 12; frame++) {
+						const previous = enemy.root.position.clone();
 						enemy.update(0.4, false);
 						physics.loop(STEP);
 						scene.updateMatrixWorld(true);
@@ -1088,7 +1274,8 @@ test('larger animated bugs fit every spawn lane on desktop and portrait screens'
 								(object as THREE.SkinnedMesh).computeBoundingBox();
 						});
 						assert.ok(
-							Math.abs(enemy.root.position.x) <= AIM_LIMIT_X && enemy.root.position.y < 14,
+							Math.abs(enemy.root.position.x) <= AIM_LIMIT_X &&
+								enemy.root.position.y < 14 + BUGS[kind].radius,
 							'aim can reach the target'
 						);
 						const bounds = new THREE.Box3().setFromObject(enemy.root);
@@ -1096,8 +1283,23 @@ test('larger animated bugs fit every spawn lane on desktop and portrait screens'
 							bounds.min.x >= 4 || bounds.max.x <= -4,
 							'bugs leave clear space around the urinal'
 						);
-						if (kind === 'spider')
-							assert.ok(Math.abs(bounds.min.y) < 0.03, 'feet stay grounded in both directions');
+						if (kind === 'spider') {
+							if (!enemy.dropping)
+								assert.ok(Math.abs(bounds.min.y) < 0.03, 'feet stay grounded after landing');
+							const travel = enemy.root.position.clone().sub(previous).setY(0);
+							if (travel.lengthSq() > 1e-6) {
+								const front = enemy.root
+									.getObjectByName('cheliceraL_69_80')!
+									.getWorldPosition(new THREE.Vector3());
+								const body = enemy.root
+									.getObjectByName('cephalothoraxM_71_12')!
+									.getWorldPosition(new THREE.Vector3());
+								assert.ok(
+									front.sub(body).setY(0).normalize().dot(travel.normalize()) > 0.9,
+									`${enemy.pattern} spider in lane ${lane} walks forward, never backward`
+								);
+							}
+						}
 						for (const [width, height] of [
 							[1280, 720],
 							[390, 844],
@@ -1105,6 +1307,37 @@ test('larger animated bugs fit every spawn lane on desktop and portrait screens'
 							[844, 390]
 						]) {
 							camera.resize(width, height);
+							const target = enemy.root.position.clone().project(camera.instance);
+							canvas.dispatchEvent(
+								Object.assign(new Event('pointermove'), {
+									clientX: (target.x + 1) * 400,
+									clientY: (1 - target.y) * 300
+								})
+							);
+							const aimed = manager.resolveAim(input.aim, camera.instance);
+							assert.ok(
+								Math.abs(aimed.z - enemy.root.position.z) < 1e-6,
+								'screen aim follows enemy depth'
+							);
+							assert.ok(
+								aimed.distanceTo(enemy.root.position) <
+									(enemy.dropping ? BUGS.spider.radius : 1e-5),
+								`screen aim reaches ${enemy.pattern} at ${width}x${height}`
+							);
+							if (kind === 'wasp') {
+								const head = enemy.root
+									.getObjectByName('Head')!
+									.getWorldPosition(new THREE.Vector3());
+								const thorax = enemy.root
+									.getObjectByName('Thorax')!
+									.getWorldPosition(new THREE.Vector3());
+								const facing = head.sub(thorax).normalize();
+								const view = camera.instance.position.clone().sub(thorax).normalize();
+								assert.ok(
+									facing.dot(view) > 0.5,
+									`wasp lane ${lane} keeps its face toward the camera`
+								);
+							}
 							for (const x of [bounds.min.x, bounds.max.x])
 								for (const y of [bounds.min.y, bounds.max.y])
 									for (const z of [bounds.min.z, bounds.max.z]) {
@@ -1117,11 +1350,17 @@ test('larger animated bugs fit every spawn lane on desktop and portrait screens'
 						}
 					}
 				} finally {
+					manager.enemies.delete(id);
 					enemy.dispose();
 				}
 			}
 		}
+		assert.ok(
+			manager.resolveAim(input.aim, camera.instance).distanceTo(input.aim) < 1e-6,
+			'empty space retains the original aim plane'
+		);
 	} finally {
+		input.dispose();
 		physics.dispose();
 		disposeResources(assets.map((asset) => asset.scene));
 	}
@@ -1163,6 +1402,12 @@ test('leaderboard validates untrusted results, sorts, deduplicates, and survives
 	);
 	assert.equal(validEntry({ ...entry, name: '<script>' }), false);
 	assert.equal(validEntry({ ...entry, rulesVersion: 'old' }), false);
+	assert.equal(
+		validResult({ ...entry, score: 1500, duration: 10, kills: 0, missed: 0 }),
+		true,
+		'boosted flow can legitimately score 150 points per second'
+	);
+	assert.equal(validResult({ ...entry, score: 1501, duration: 10, kills: 0, missed: 0 }), false);
 	assert.equal(rankScores([entry, { ...entry, id: 'two', accuracy: 1 }])[0].id, 'two');
 	mockGlobal(t, 'localStorage', {
 		getItem: () => '{oops',

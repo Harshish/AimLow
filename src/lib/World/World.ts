@@ -53,7 +53,7 @@ export default class World {
 				const state = this.session.state;
 				this.waterJet.update(
 					STEP,
-					this.input.aim,
+					this.enemies.resolveAim(this.input.aim, this.camera),
 					jetProfile(state.pressure, state.drink?.kind ?? null)
 				);
 				const flow = this.waterJet.resolve(

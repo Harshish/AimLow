@@ -24,15 +24,18 @@ The game includes solo play, 2–8-player same-device party play, leaderboards, 
 - Touch: drag on the arena; lifting your finger keeps the last aim.
 - Keyboard: WASD/arrow keys aim; Escape pauses/resumes.
 - Switching tabs or losing focus pauses the round. Resume explicitly.
-- **Foam Party:** stronger, wider, cyan stream.
-- **Cola Laser:** thinner, focused, blue stream.
-- Spiders have 9 health and wasps 6: about 0.2s / 0.13s of direct hits at full pressure. Their active escape windows are 3s / 2.75s. Bug kills restore 8% pressure.
+- **Foam Party:** 40% faster, 25% more flow, wide cyan stream.
+- **Cola Laser:** 60% faster, 50% more flow, precise blue stream. Extra flow increases both damage and bowl score.
+- Spiders start with 9 health and wasps 6: about 0.2s / 0.13s of direct hits at full pressure. Health rises 6% of base per wave, capped at +80%. Active escape windows stay at 3s / 2.75s. Bug kills restore 8% pressure.
 - A 3-second clean bowl streak awards an 8-second power-up plus 15% pressure (capped at 100%). Rewards alternate Foam Party / Cola Laser. Spills, bug hits, or a sustained gap reset progress; tiny gaps between droplets are tolerated but add no progress. Streaks cannot charge during an active power-up. There are no collectible cans.
-- Waves grow from 3 to 8 bugs, with a 3-second breather between waves and at most 4 bugs on screen. Spawns ease from 2.4 seconds apart to a 1.6-second minimum. After wave 8, pressure drain rises by 0.15 per second each wave rather than crowding the arena further.
-- Bugs use six randomized ground/air lanes set farther from the urinal. Wider camera framing and aim bounds keep them reachable. Oversized bugs pop into view (disabled by reduced motion); the HUD shows streak progress and the active reward.
+- Waves grow from 3 to 10 bugs, with a 4-second breather to recharge bowl streaks and at most 4 bugs on screen. Spawn intervals drop by 0.17s per wave, from 2.4s to a 1s minimum. Pressure drain starts at 1.25 per second and rises by 0.25 each wave from wave 2 onward.
+- Wave 3 introduces wasps that hold a perch, then dart smoothly to another. Hover windows shorten from 1.17s to a 0.7s minimum as waves advance.
+- Wave 4 mixes in spiders crawling along Z; wave 7 adds ceiling-drop spiders. Drops take 1.25s after the spawn cue and get a full 3s ground escape window on landing. Their side is reserved while falling so they do not overlap wasps.
+- Spiders face their travel direction, including depth crawls. Aim at the visible bug with mouse, touch, or keyboard; the stream adjusts to its depth without snapping sideways.
+- Bugs use six randomized ground/air lanes set farther from the urinal. Wider camera framing and aim bounds keep them reachable. Reduced motion disables cosmetic pop/spin, not gameplay movement; the HUD shows streak progress and the active reward.
 - Faster shots and keyboard aiming reduce target-switching delay. Low pressure retains enough jet speed and damage for a recovery kill.
-- Bowl flow earns 100 points per second; spills cost 35. Accuracy includes successful bowl and bug hits.
-- Reaction/streak rules use the `arcade-5` leaderboard. Older scores remain stored separately.
+- Normal bowl flow earns 100 points per second; Foam Party earns up to 125 and Cola Laser up to 150. Spills cost 35 per full-flow second. Accuracy includes successful bowl and bug hits.
+- Rebalanced waves and power-ups use the `arcade-7` leaderboard. Older scores remain stored separately.
 
 ## Local score storage
 

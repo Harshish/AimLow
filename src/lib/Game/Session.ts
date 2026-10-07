@@ -7,8 +7,7 @@ import {
 	BOWL_STREAK_GRACE,
 	POWERUP_DURATION,
 	STEP,
-	PRESSURE_DRAIN,
-	LATE_WAVE_DRAIN,
+	waveProfile,
 	SCORE_PER_FLOW,
 	SPILL_PENALTY_PER_FLOW,
 	type BugKind,
@@ -116,8 +115,7 @@ export default class Session {
 				s.drink.remaining -= dt;
 				if (s.drink.remaining <= 0) s.drink = null;
 			}
-			// Endless difficulty grows gently without shrinking hit windows or crowding lanes.
-			this.losePressure((PRESSURE_DRAIN + Math.max(0, s.wave - 8) * LATE_WAVE_DRAIN) * dt);
+			this.losePressure(waveProfile(s.wave).pressureDrain * dt);
 		}
 	}
 
@@ -153,8 +151,18 @@ export default class Session {
 		if (!this.playing) return;
 		this.state.wave++;
 		this.state.waveRemaining = count;
+		const warning =
+			this.state.wave === 3
+				? 'WASPS NOW DART'
+				: this.state.wave === 4
+					? 'WATCH THE BACK ROW'
+					: this.state.wave === 7
+						? 'SPIDERS FROM ABOVE'
+						: this.state.wave > 1
+							? 'PRESSURE RISING'
+							: '';
 		this.announce(
-			`WAVE ${this.state.wave} · ${count} BUGS INCOMING!${this.state.wave > 8 ? ' · PRESSURE RISING' : ''}`,
+			`WAVE ${this.state.wave} · ${count} BUGS INCOMING!${warning ? ` · ${warning}` : ''}`,
 			'good'
 		);
 	}

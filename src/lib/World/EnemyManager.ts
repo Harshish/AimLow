@@ -1,11 +1,12 @@
-import type * as THREE from 'three/webgpu';
+import * as THREE from 'three/webgpu';
 import type Physics from './Physics';
 import type { LoadedAssets } from '../Utils/Assets';
 import Session from '../Game/Session';
 import {
+	BUGS,
 	DAMAGE_PER_FLOW,
 	FLOW_RATE,
-	MIN_SPAWN_INTERVAL,
+	waveProfile,
 	WAVE_BREAK,
 	MAX_WAVE_SIZE,
 	MAX_ACTIVE_ENEMIES,
@@ -19,6 +20,10 @@ export default class EnemyManager {
 	private nextWaveAt: number | null = WAVE_BREAK;
 	private pending = 0;
 	private sequence = 0;
+	private readonly aimRay = new THREE.Ray();
+	private readonly aimSphere = new THREE.Sphere();
+	private readonly aimHit = new THREE.Vector3();
+	private readonly shotAim = new THREE.Vector3();
 	constructor(
 		private readonly scene: THREE.Scene,
 		private readonly physics: Physics,
@@ -38,19 +43,36 @@ export default class EnemyManager {
 		if (this.pending > 0 && time >= this.nextSpawn && this.enemies.size < MAX_ACTIVE_ENEMIES) {
 			const kind = (this.sequence + this.session.state.wave) % 2 ? 'spider' : 'wasp';
 			const occupied = new Set([...this.enemies.values()].map((enemy) => enemy.lane));
+			const dropping =
+				kind === 'spider' && this.session.state.wave >= 7 && (this.sequence + 1) % 3 === 0;
 			const lanes = ENEMY_LANES.map((_, i) => i).filter(
-				(i) => ENEMY_LANES[i].kind === kind && !occupied.has(i)
+				(i) =>
+					ENEMY_LANES[i].kind === kind &&
+					!occupied.has(i) &&
+					// Reserve the falling spider's side so it does not pass through a wasp.
+					![...this.enemies.values()].some(
+						(enemy) =>
+							Math.sign(ENEMY_LANES[enemy.lane].x) === Math.sign(ENEMY_LANES[i].x) &&
+							(enemy.dropping || (dropping && enemy.kind === 'wasp'))
+					)
 			);
 			if (lanes.length) {
 				const lane = lanes[Math.floor(Math.random() * lanes.length)];
 				const id = ++this.sequence;
 				this.enemies.set(
 					id,
-					new Enemy(id, kind, this.assets[kind], this.scene, this.physics, lane)
+					new Enemy(
+						id,
+						kind,
+						this.assets[kind],
+						this.scene,
+						this.physics,
+						lane,
+						this.session.state.wave
+					)
 				);
 				this.pending--;
-				this.nextSpawn =
-					time + Math.max(MIN_SPAWN_INTERVAL, 2.4 - (this.session.state.wave - 1) * 0.1);
+				this.nextSpawn = time + waveProfile(this.session.state.wave).spawnInterval;
 			}
 		}
 		for (const [id, enemy] of this.enemies) {
@@ -64,6 +86,27 @@ export default class EnemyManager {
 			this.nextWaveAt = time + WAVE_BREAK;
 			this.session.endWave();
 		}
+	}
+	resolveAim(aim: THREE.Vector3, camera: THREE.Camera) {
+		// Keep the cursor's screen direction, but shoot at the depth of the bug under it.
+		// This works for pointer, touch, and keyboard without snapping sideways to targets.
+		camera.getWorldPosition(this.aimRay.origin);
+		this.aimRay.direction.subVectors(aim, this.aimRay.origin).normalize();
+		let nearest = Infinity,
+			depth = aim.z;
+		for (const enemy of this.enemies.values()) {
+			if (enemy.status === 'dead' || enemy.status === 'escaped') continue;
+			this.aimSphere.center.copy(enemy.root.position);
+			this.aimSphere.radius = BUGS[enemy.kind].radius;
+			if (!this.aimRay.intersectSphere(this.aimSphere, this.aimHit)) continue;
+			const distance = this.aimHit.distanceToSquared(this.aimRay.origin);
+			if (distance < nearest) {
+				nearest = distance;
+				depth = enemy.root.position.z;
+			}
+		}
+		if (Math.abs(this.aimRay.direction.z) < 1e-6) return this.shotAim.copy(aim);
+		return this.aimRay.at((depth - this.aimRay.origin.z) / this.aimRay.direction.z, this.shotAim);
 	}
 	hit(id: number) {
 		const enemy = this.enemies.get(id);

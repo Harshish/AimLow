@@ -1,4 +1,10 @@
-import { MIN_SPAWN_INTERVAL, RULES_VERSION } from './config';
+import {
+	MIN_SPAWN_INTERVAL,
+	RULES_VERSION,
+	MAX_FLOW_RATE,
+	FLOW_RATE,
+	SCORE_PER_FLOW
+} from './config';
 import type { RoundResult } from './Session';
 
 export type ScoreEntry = RoundResult & {
@@ -34,7 +40,8 @@ export function validResult(value: unknown): value is RoundResult {
 		Number.isSafeInteger(s.missed) &&
 		s.missed >= 0 &&
 		s.kills + s.missed <= Math.ceil(s.duration / MIN_SPAWN_INTERVAL) &&
-		s.score <= Math.ceil(s.duration * 100 + s.kills * 200) &&
+		s.score <=
+			Math.ceil(s.duration * (MAX_FLOW_RATE / FLOW_RATE) * SCORE_PER_FLOW + s.kills * 200) &&
 		(s.accuracy === null || (Number.isFinite(s.accuracy) && s.accuracy >= 0 && s.accuracy <= 1))
 	);
 }

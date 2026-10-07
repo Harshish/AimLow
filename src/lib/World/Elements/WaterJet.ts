@@ -2,7 +2,13 @@ import * as THREE from 'three/webgpu';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import type Physics from '../Physics';
 import { orderHits, type ParticleHit, type Target } from '../../Utils/CollisionHandler';
-import { FLOW_RATE, PARTICLE_LIFE, PARTICLE_RADIUS, jetProfile } from '../../Game/config';
+import {
+	FLOW_RATE,
+	MAX_FLOW_RATE,
+	PARTICLE_LIFE,
+	PARTICLE_RADIUS,
+	jetProfile
+} from '../../Game/config';
 
 type Particle = { body: RAPIER.RigidBody; life: number };
 
@@ -30,7 +36,7 @@ export class WaterJet {
 		this.particlesMesh = new THREE.InstancedMesh(
 			this.geometry,
 			this.material,
-			Math.ceil(FLOW_RATE * PARTICLE_LIFE) + 8
+			Math.ceil(MAX_FLOW_RATE * PARTICLE_LIFE) + 8
 		);
 		this.particlesMesh.count = 0;
 		this.particlesMesh.frustumCulled = false;

@@ -50,8 +50,8 @@
 			<div>
 				<b>{DRINKS[state.drink.kind].name}</b><small
 					>{state.drink.remaining.toFixed(1)}s · {state.drink.kind === 'beer'
-						? 'WIDE & WILD'
-						: 'THIN & FOCUSED'}</small
+						? '+25% FLOW · WIDE & WILD'
+						: '+50% FLOW · LASER PRECISION'}</small
 				>
 			</div>
 		</div>{:else}<div class="streak-meter">

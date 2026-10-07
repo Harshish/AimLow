@@ -379,8 +379,10 @@
 								<div>
 									<b>React fast.</b>
 									<p>
-										Bugs need only a short burst, but escape in about 3 seconds. Snap to each target
-										for 8% pressure, then return to the bowl. After wave 8, pressure drains faster.
+										Waves get faster, tougher, and drain more pressure. From wave 3, wasps pause
+										then dart. Wave 4 adds depth-crawling spiders; wave 7 adds ceiling drops. Aim at
+										the bug—the stream follows its depth. Kills restore 8% pressure. Use the
+										4-second breaks to charge a bowl reward.
 									</p>
 								</div>
 							</li>
@@ -389,9 +391,10 @@
 								<div>
 									<b>Use your reward.</b>
 									<p>
-										Streak rewards alternate between wide Foam Party and focused Cola Laser. Each
-										lasts 8 seconds and restores 15% pressure. Build another streak after it
-										expires. Empty tank, game over.
+										Foam Party brings 25% more flow. Cola Laser fires 60% faster with 50% more flow
+										and pinpoint aim: more damage and bowl points. Rewards alternate, last 8
+										seconds, and restore 15% pressure. Build another streak after expiry. Empty
+										tank, game over.
 									</p>
 								</div>
 							</li>

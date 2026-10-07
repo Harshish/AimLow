@@ -7,19 +7,20 @@ export default class Environment {
 	constructor(scene: THREE.Scene, physics: Physics, assets: LoadedAssets) {
 		scene.background = new THREE.Color(0x30435e);
 		scene.fog = new THREE.Fog(0x30435e, 60, 130);
-		scene.add(new THREE.HemisphereLight(0xddeaff, 0x718598, 1.35));
-		const key = new THREE.DirectionalLight(0xffffff, 1.1);
+		scene.add(new THREE.HemisphereLight(0xddeaff, 0x718598, 0.95));
+		const key = new THREE.DirectionalLight(0xffffff, 0.85);
 		key.position.set(-6, 18, 18);
 		scene.add(key);
-		// Soft, static stage spots: color on the porcelain without washing out the arena.
-		for (const [color, x, y, z, targetX, targetY] of [
-			[0x42cfff, -6, 14, 10, -1, 7],
-			[0xff72aa, 6, 13, 9, 1, 7],
-			[0x9674ff, 0, 16, 6, 0, 4]
+		// Overhead color washes only: no visible fixtures or beam geometry in the arena.
+		// Higher intensity compensates for inverse-square falloff from the raised lights.
+		for (const [color, intensity, x, y, z, targetX, targetY, targetZ] of [
+			[0x24dfff, 5000, -5, 40, 12, -1.2, 7.5, 4],
+			[0xff46ae, 5500, 5, 42, 11, 1.3, 7, 4],
+			[0xffd34e, 4000, 0, 44, 13, 0.2, 5.8, 5.5]
 		]) {
-			const spot = new THREE.SpotLight(color, 180, 32, Math.PI / 7, 0.65, 2);
+			const spot = new THREE.SpotLight(color, intensity, 80, Math.PI / 18, 0.65, 2);
 			spot.position.set(x, y, z);
-			spot.target.position.set(targetX, targetY, 3.5);
+			spot.target.position.set(targetX, targetY, targetZ);
 			scene.add(spot, spot.target);
 		}
 

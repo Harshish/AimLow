@@ -3,13 +3,16 @@ import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import type Physics from '../Physics';
-import { BUGS, ENEMY_LANES, type BugKind } from '../../Game/config';
+import { BUGS, ENEMY_LANES, waveProfile, type BugKind } from '../../Game/config';
 
 /** One data-driven actor, not a subclass hierarchy for two nearly identical bugs. */
 export default class Enemy {
 	readonly root = new THREE.Group();
 	readonly mixer: THREE.AnimationMixer;
 	readonly body: RAPIER.RigidBody;
+	readonly maxHealth: number;
+	readonly pattern: 'crawl' | 'depth' | 'drop' | 'hover' | 'dart';
+	private readonly hoverDuration: number;
 	health: number;
 	age = 0;
 	status: 'spawning' | 'active' | 'dead' | 'escaped' = 'spawning';
@@ -41,13 +44,34 @@ export default class Enemy {
 		private readonly asset: GLTF,
 		private readonly scene: THREE.Scene,
 		private readonly physics: Physics,
-		readonly lane: number
+		readonly lane: number,
+		wave = 1
 	) {
-		this.health = BUGS[kind].health;
+		const difficulty = waveProfile(wave);
+		this.maxHealth = BUGS[kind].health * difficulty.healthMultiplier;
+		this.health = this.maxHealth;
+		this.hoverDuration = difficulty.waspHover;
+		this.pattern =
+			kind === 'wasp'
+				? wave >= 3
+					? 'dart'
+					: 'hover'
+				: wave >= 7 && id % 3 === 0
+					? 'drop'
+					: wave >= 4 && id % 3 === 1
+						? 'depth'
+						: 'crawl';
 		this.model = clone(asset.scene);
 		const side = Math.sign(ENEMY_LANES[lane].x);
+		// Spiders face local +Z; wasps face local +X. Match the spider's actual travel sign.
 		this.model.rotation.y =
-			kind === 'spider' ? (side * (this.inward ? 1 : -1) * Math.PI) / 2 : (-side * Math.PI) / 2;
+			kind === 'wasp'
+				? -Math.PI / 2 - (side * Math.PI) / 10
+				: this.pattern === 'depth'
+					? this.inward
+						? 0
+						: Math.PI
+					: (-side * (this.inward ? 1 : -1) * Math.PI) / 2;
 		this.mixer = new THREE.AnimationMixer(this.model);
 		this.mixer.timeScale = 1.8;
 		this.play(kind === 'spider' ? 'walk cycle' : 'Wasp_Flying');
@@ -97,8 +121,13 @@ export default class Enemy {
 	get active() {
 		return this.status === 'active';
 	}
+	get dropping() {
+		return this.pattern === 'drop' && this.age < 1.55;
+	}
 	get remaining() {
-		return Math.max(0, BUGS[this.kind].deadline - Math.max(0, this.age - 0.3));
+		// Falling spiders can be shot in the air, but get a full escape window on the floor.
+		const delay = this.pattern === 'drop' ? 1.55 : 0.3;
+		return Math.max(0, BUGS[this.kind].deadline - Math.max(0, this.age - delay));
 	}
 	private play(suffix: string, once = false) {
 		const clip = this.asset.animations.find((clip) => clip.name.endsWith(suffix));
@@ -113,20 +142,38 @@ export default class Enemy {
 	private move() {
 		const lane = ENEMY_LANES[this.lane];
 		const side = Math.sign(lane.x);
-		const progress = Math.min(1, Math.max(0, this.age - 0.3) / BUGS[this.kind].deadline);
+		const time = Math.max(0, this.age - 0.3);
 		// Stay beside the porcelain: targets must never hide behind its physical shell.
-		if (this.kind === 'spider')
+		if (this.kind === 'spider') {
+			const crawlTime = Math.max(0, time - (this.pattern === 'drop' ? 1.25 : 0));
+			const progress = Math.min(1, crawlTime / BUGS.spider.deadline);
+			const falling = this.pattern === 'drop' ? 14 * (1 - Math.min(1, time / 1.25) ** 2) : 0;
 			this.position.set(
-				lane.x + side * (this.inward ? 1 - progress * 2 : progress * 2 - 1),
-				this.groundHeight * this.root.scale.y,
+				this.pattern === 'depth'
+					? lane.x
+					: lane.x + side * (this.inward ? 1 - progress * 2 : progress * 2 - 1),
+				this.groundHeight * this.root.scale.y + falling,
+				this.pattern === 'depth' ? 3.25 + 2.25 * (this.inward ? progress : 1 - progress) : 5.5
+			);
+		} else if (this.pattern === 'dart') {
+			// Hold a readable target, then smoothly move to the next perch; never teleport.
+			const cycle = this.hoverDuration + 0.45;
+			const perch = Math.floor(time / cycle);
+			const travel = THREE.MathUtils.smoothstep(time % cycle, this.hoverDuration, cycle);
+			const from = this.motionPhase + perch * 2.4;
+			const to = from + 2.4;
+			this.position.set(
+				lane.x + THREE.MathUtils.lerp(Math.sin(from), Math.sin(to), travel) * 1.1,
+				lane.y + THREE.MathUtils.lerp(Math.cos(from), Math.cos(to), travel) * 0.8,
 				5.5
 			);
-		else
+		} else {
 			this.position.set(
 				lane.x + Math.sin(this.age * 3.6 + this.motionPhase) * 0.7,
 				lane.y + Math.sin(this.age * 4.8 + this.motionPhase) * 0.55,
 				5.5
 			);
+		}
 	}
 	update(dt: number, reducedMotion: boolean) {
 		if (this.status === 'dead' || this.status === 'escaped') {
@@ -145,7 +192,7 @@ export default class Enemy {
 		this.move();
 		this.body.setNextKinematicTranslation(this.position);
 		this.mixer.update(dt);
-		this.healthBar.scale.x = Math.max(0.01, this.health / BUGS[this.kind].health);
+		this.healthBar.scale.x = Math.max(0.01, this.health / this.maxHealth);
 		this.timerBar.scale.x = Math.max(0.01, this.remaining / BUGS[this.kind].deadline);
 		this.timerMaterial.color.set(this.remaining < 2 ? 0xff6577 : 0xffb74d);
 		this.hitFlash = Math.max(0, this.hitFlash - dt);
