@@ -1,9 +1,132 @@
-@import url('https://fonts.googleapis.com/css?family=Amatic+SC');
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
 
+:root {
+	font-family: 'Avenir Next', 'Segoe UI', sans-serif;
+	color: #f3f3e8;
+	background: #101c28;
+	font-synthesis: none;
+	--ink: #101c28;
+	--paper: #f3f3e8;
+	--lime: #dfff6a;
+	--mint: #8ae8d2;
+	--coral: #ff7c7e;
+	--muted: #9baeb7;
+	--line: #ffffff21;
+	--display: 'Arial Black', 'Avenir Next', 'Segoe UI', sans-serif;
+	--mono: 'SFMono-Regular', Consolas, monospace;
+}
+* {
+	box-sizing: border-box;
+}
 body {
 	margin: 0;
 	overflow: hidden;
+}
+button,
+input,
+select {
+	font: inherit;
+}
+button {
+	cursor: pointer;
+}
+button:disabled {
+	cursor: wait;
+	opacity: 0.5;
+}
+button,
+a,
+input,
+select {
+	-webkit-tap-highlight-color: transparent;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+	outline: 3px solid var(--mint);
+	outline-offset: 4px;
+}
+a {
+	color: inherit;
+}
+.eyebrow {
+	font: 700 0.65rem var(--mono);
+	letter-spacing: 0.14em;
+	color: var(--muted);
+}
+.primary,
+.secondary,
+.text-button {
+	min-height: 48px;
+	border-radius: 8px;
+	font-size: 0.85rem;
+	font-weight: 800;
+	letter-spacing: 0.025em;
+}
+.primary {
+	background: var(--lime);
+	color: var(--ink);
+	border: 1px solid var(--lime);
+	padding: 0.95rem 1.4rem;
+	box-shadow: 0 5px 0 #aec63c;
+	transition:
+		translate 0.15s,
+		background 0.15s;
+}
+.primary:hover:not(:disabled) {
+	background: #eaff9f;
+	translate: 0 -2px;
+}
+.secondary {
+	background: #ffffff07;
+	border: 1px solid #ffffff2e;
+	color: var(--paper);
+	padding: 0.9rem 1.2rem;
+}
+.secondary:hover {
+	background: #ffffff10;
+}
+.text-button {
+	border: 0;
+	background: transparent;
+	color: var(--muted);
+	padding: 0.65rem 0.2rem;
+	font-size: 0.75rem;
+}
+.text-button:hover {
+	color: var(--paper);
+}
+input:not([type='checkbox']):not([type='range']),
+select {
+	color: var(--paper);
+	background: #0b1721;
+	border: 1px solid #ffffff36;
+	border-radius: 6px;
+	padding: 0.75rem;
+	width: 100%;
+}
+input[type='checkbox'],
+input[type='range'] {
+	accent-color: var(--lime);
+}
+input[type='checkbox'] {
+	width: 20px;
+	height: 20px;
+}
+.reduced-motion *,
+.reduced-motion *::before,
+.reduced-motion *::after {
+	scroll-behavior: auto !important;
+	transition-duration: 0.001ms !important;
+}
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		scroll-behavior: auto !important;
+		transition-duration: 0.001ms !important;
+	}
 }

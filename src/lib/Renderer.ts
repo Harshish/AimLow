@@ -13,9 +13,9 @@ export default class Renderer {
 		private readonly camera: THREE.PerspectiveCamera
 	) {
 		this.instance = new THREE.WebGPURenderer({ canvas, antialias: true });
-		this.instance.shadowMap.enabled = true;
-		this.instance.shadowMap.type = THREE.VSMShadowMap;
-		this.instance.setClearColor(0x000000);
+		this.instance.toneMapping = THREE.ACESFilmicToneMapping;
+		this.instance.toneMappingExposure = 0.95;
+		this.instance.setClearColor(0x30435e);
 	}
 
 	init(): Promise<void> {

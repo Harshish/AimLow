@@ -1,174 +1,118 @@
 import * as THREE from 'three/webgpu';
-import { gameStateStore } from '../../Utils/Store';
-import type Physics from '$lib/World/Physics';
-import type RAPIER_TYPE from '@dimforge/rapier3d-compat';
+import type RAPIER from '@dimforge/rapier3d-compat';
+import type Physics from '../Physics';
+import { orderHits, type ParticleHit, type Target } from '../../Utils/CollisionHandler';
+import { FLOW_RATE, PARTICLE_LIFE, PARTICLE_RADIUS, jetProfile } from '../../Game/config';
 
-type Particle = {
-	body: RAPIER_TYPE.RigidBody;
-	life: number;
-};
+type Particle = { body: RAPIER.RigidBody; life: number };
 
 export class WaterJet {
-	startPos!: THREE.Vector3;
-	particles: Particle[] = [];
-	mouseX: number = 0;
-	mouseY: number = 0;
-	halfX: number = window.innerWidth / 2;
-	halfY: number = window.innerHeight / 2;
-	acc: number = 0;
-	geometry!: THREE.PlaneGeometry;
-	material!: THREE.MeshBasicNodeMaterial;
-	particlesMesh!: THREE.InstancedMesh;
-	maxParticles: number = 300;
-	emitRate: number = 150;
-	particleLife: number = 3;
-	waterColor: THREE.Color;
-	private readonly instanceMatrix = new THREE.Matrix4();
+	readonly particles = new Map<number, Particle>();
+	readonly startPos = new THREE.Vector3(0, 7, 17);
+	readonly particlesMesh: THREE.InstancedMesh;
+	private readonly geometry = new THREE.SphereGeometry(PARTICLE_RADIUS, 6, 4);
+	private readonly material = new THREE.MeshBasicMaterial({
+		color: jetProfile(100, null).color,
+		transparent: true,
+		opacity: 0.95,
+		toneMapped: false
+	});
+	private readonly matrix = new THREE.Matrix4();
 	private readonly velocity = new THREE.Vector3();
-	private readonly removeCollisionHandlers: (() => void)[];
+	private nextId = 0;
+	private accumulator = 0;
 	private disposed = false;
+
 	constructor(
 		private readonly scene: THREE.Scene,
-		private readonly physics: Physics,
-		startPos: THREE.Vector3
+		private readonly physics: Physics
 	) {
-		this.startPos = startPos.clone();
-
-		// Water Droplet
-		const DROPLET_SIZE = 0.2;
-
-		this.geometry = new THREE.PlaneGeometry(DROPLET_SIZE, DROPLET_SIZE);
-
-		this.waterColor = new THREE.Color(0x4fc3f7);
-
-		this.material = new THREE.MeshBasicNodeMaterial({
-			color: this.waterColor,
-			transparent: true,
-			opacity: 0.55,
-			depthWrite: false
-		});
-
-		this.particlesMesh = new THREE.InstancedMesh(this.geometry, this.material, this.maxParticles);
+		this.particlesMesh = new THREE.InstancedMesh(
+			this.geometry,
+			this.material,
+			Math.ceil(FLOW_RATE * PARTICLE_LIFE) + 8
+		);
 		this.particlesMesh.count = 0;
-		this.particlesMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-		// Instances move every frame; a cached bounding sphere would cull live droplets.
 		this.particlesMesh.frustumCulled = false;
-		this.scene.add(this.particlesMesh);
-
-		this.onPointerMove = this.onPointerMove.bind(this);
-		window.addEventListener('pointermove', this.onPointerMove);
-
-		this.onWindowResize = this.onWindowResize.bind(this);
-		window.addEventListener('resize', this.onWindowResize);
-
-		this.removeCollisionHandlers = ['ground', 'urinal', 'wall'].map((name) =>
-			physics.collisionHandler.addCollisionHandler(name, undefined, this.handleCollision)
-		);
+		this.particlesMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+		scene.add(this.particlesMesh);
 	}
-
-	private handleCollision(
-		mesh1: THREE.Object3D | undefined,
-		mesh2: THREE.Object3D | undefined,
-		started: boolean
-	) {
-		if (!started) return;
-		const name = mesh1 ? mesh1.userData.name : mesh2?.userData.name;
-		const change = name === 'urinal' ? 1 : name === 'ground' || name === 'wall' ? -1 : 0;
-		if (change) gameStateStore.update((state) => ({ ...state, score: state.score + change }));
-	}
-
-	private spawnWater() {
-		// Screen space mouse dir; reuse the vector for every emitted droplet.
-		const dir = this.velocity
-			.set((this.mouseX / this.halfX) * 2, (this.mouseY / this.halfY) * 1.5 + 1, -2)
-			.normalize();
-
-		const speed = 15;
-		const velocity = dir.multiplyScalar(speed);
-
-		// tiny turbulence
-		velocity.x += (Math.random() - 0.5) * 0.2;
-		velocity.y += (Math.random() - 0.5) * 0.2;
-		velocity.z += (Math.random() - 0.5) * 0.1;
-
-		const body = this.physics.addParticle(
-			this.startPos.x,
-			this.startPos.y,
-			this.startPos.z,
-			velocity
-		);
-
-		this.particles.push({
-			body,
-			life: this.particleLife
-		});
-
-		if (this.particles.length > this.maxParticles) {
-			const oldParticle = this.particles.shift(); // remove oldest
-			if (oldParticle) this.physics.removeParticle(oldParticle.body);
-		}
-	}
-
-	private onPointerMove(e: PointerEvent) {
-		this.mouseX = e.clientX - this.halfX;
-		this.mouseY = e.clientY - this.halfY;
-	}
-
-	private onWindowResize() {
-		this.halfX = window.innerWidth / 2;
-		this.halfY = window.innerHeight / 2;
-	}
-
-	update(deltaTime: number) {
+	update(dt: number, aim: THREE.Vector3, profile: ReturnType<typeof jetProfile>) {
 		if (this.disposed) return;
-
-		this.acc += deltaTime * this.emitRate;
-
-		while (this.acc >= 1) {
-			this.spawnWater();
-			this.acc -= 1;
+		this.material.color.set(profile.color);
+		for (const p of this.particles.values()) p.life -= dt;
+		this.accumulator += dt * profile.emission;
+		while (this.accumulator >= 1 && profile.speed > 0) {
+			this.accumulator--;
+			const dx = aim.x - this.startPos.x,
+				dz = aim.z - this.startPos.z;
+			const time = Math.hypot(dx, dz) / profile.speed;
+			// Compensate gravity at every speed, including boosted shots at high flying targets.
+			this.velocity.set(
+				dx / time,
+				(aim.y - this.startPos.y + 4.905 * time * time) / time,
+				dz / time
+			);
+			this.velocity.x += (Math.random() - 0.5) * profile.spread * 2;
+			this.velocity.y += (Math.random() - 0.5) * profile.spread * 2;
+			const id = ++this.nextId;
+			this.particles.set(id, {
+				body: this.physics.addParticle(id, this.startPos, this.velocity),
+				life: PARTICLE_LIFE
+			});
 		}
-
-		// update particles
-		for (let i = this.particles.length - 1; i >= 0; i--) {
-			const particle = this.particles[i];
-			particle.life -= deltaTime;
-
-			if (particle.life <= 0) {
-				this.physics.removeParticle(particle.body);
-				this.particles.splice(i, 1);
+	}
+	resolve(hits: ParticleHit[], hitTarget: (target: Target) => boolean) {
+		let captured = 0,
+			spilled = 0,
+			targeted = 0;
+		for (const { particleId, target } of orderHits(hits)) {
+			const particle = this.particles.get(particleId);
+			if (!particle || target.kind === 'shell') continue;
+			if (target.kind === 'enemy') {
+				if (!hitTarget(target)) continue;
+				targeted += 1 / FLOW_RATE;
+			} else if (target.kind === 'capture') {
+				// Containment counts at any angle, including rising shots into the inner bowl.
+				captured += 1 / FLOW_RATE;
+			} else spilled += 1 / FLOW_RATE;
+			this.remove(particleId);
+		}
+		for (const [id, particle] of this.particles) {
+			const p = particle.body.translation();
+			if (particle.life <= 0 || p.y < -1 || Math.abs(p.x) > 16 || p.z < 0 || p.z > 25) {
+				spilled += 1 / FLOW_RATE;
+				this.remove(id);
 			}
 		}
+		return { captured, spilled, targeted };
 	}
-
+	private remove(id: number) {
+		const particle = this.particles.get(id);
+		if (!particle) return;
+		this.physics.removeBody(particle.body);
+		this.particles.delete(id);
+	}
 	syncInstances() {
-		if (this.disposed) return;
-
-		let index = 0;
-		for (const particle of this.particles) {
-			const translation = particle.body.translation();
-
-			this.instanceMatrix.makeTranslation(translation.x, translation.y, translation.z);
-
-			this.particlesMesh.setMatrixAt(index, this.instanceMatrix);
-
-			index++;
+		let i = 0;
+		for (const { body } of this.particles.values()) {
+			const p = body.translation();
+			this.matrix.makeTranslation(p.x, p.y, p.z);
+			this.particlesMesh.setMatrixAt(i++, this.matrix);
 		}
-		this.particlesMesh.count = index;
+		this.particlesMesh.count = i;
 		this.particlesMesh.instanceMatrix.needsUpdate = true;
 	}
-
+	reset() {
+		for (const id of this.particles.keys()) this.remove(id);
+		this.accumulator = 0;
+		this.syncInstances();
+	}
 	dispose() {
 		if (this.disposed) return;
+		this.reset();
 		this.disposed = true;
-		for (const remove of this.removeCollisionHandlers) remove();
-		window.removeEventListener('pointermove', this.onPointerMove);
-		window.removeEventListener('resize', this.onWindowResize);
-
-		for (const particle of this.particles) this.physics.removeParticle(particle.body);
-
 		this.scene.remove(this.particlesMesh);
-		this.particles.length = 0;
 		this.particlesMesh.dispose();
 		this.geometry.dispose();
 		this.material.dispose();

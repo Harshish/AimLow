@@ -1,12 +1,5 @@
 import { writable } from 'svelte/store';
+import { initialState } from '../Game/Session';
 
-export const inputStore = writable({
-	forward: false,
-	backward: false,
-	left: false,
-	right: false
-});
-
-export const gameStateStore = writable({
-	score: 0
-});
+/** Read-only UI projection in practice; Session owns all gameplay mutations. */
+export const gameStateStore = writable(initialState());

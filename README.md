@@ -1,10 +1,12 @@
-# AimLow
+# Aim Low
 
-A SvelteKit game using Three.js WebGPU rendering and Rapier physics.
+**Low aim. High scores.** A local browser arcade party game built with SvelteKit, Three.js, Rapier, and SQLite.
 
-## Development
+Test your reactions: snap to animated spiders and wasps for quick burst kills, then return to the bowl. A clean 3-second bowl streak earns a stream power-up. When the tank empties, compare scores and pass the device.
 
-Use Node.js 22.12+ and pnpm.
+## Run locally
+
+Use **Node.js 22.13+** and pnpm. SQLite comes from Node's built-in `node:sqlite` module; no database installation or cloud account is needed.
 
 ```sh
 pnpm install
@@ -14,53 +16,81 @@ pnpm check
 pnpm build
 ```
 
-`pnpm test` uses Node's built-in test runner and the existing esbuild dependency.
-It covers timing, input, collisions, resource disposal, asset loading, and real
-Rapier particle simulation. No browser or additional test framework is required.
+The game includes solo play, 2–8-player same-device party play, leaderboards, instructions, settings, and score cards. Current focus: gameplay iteration. No public-launch or deployment work.
+
+### Controls
+
+- Mouse: move to aim. The stream runs automatically.
+- Touch: drag on the arena; lifting your finger keeps the last aim.
+- Keyboard: WASD/arrow keys aim; Escape pauses/resumes.
+- Switching tabs or losing focus pauses the round. Resume explicitly.
+- **Foam Party:** stronger, wider, cyan stream.
+- **Cola Laser:** thinner, focused, blue stream.
+- Spiders have 9 health and wasps 6: about 0.2s / 0.13s of direct hits at full pressure. Their active escape windows are 3s / 2.75s. Bug kills restore 8% pressure.
+- A 3-second clean bowl streak awards an 8-second power-up plus 15% pressure (capped at 100%). Rewards alternate Foam Party / Cola Laser. Spills, bug hits, or a sustained gap reset progress; tiny gaps between droplets are tolerated but add no progress. Streaks cannot charge during an active power-up. There are no collectible cans.
+- Waves grow from 3 to 8 bugs, with a 3-second breather between waves and at most 4 bugs on screen. Spawns ease from 2.4 seconds apart to a 1.6-second minimum. After wave 8, pressure drain rises by 0.15 per second each wave rather than crowding the arena further.
+- Bugs use six randomized ground/air lanes set farther from the urinal. Wider camera framing and aim bounds keep them reachable. Oversized bugs pop into view (disabled by reduced motion); the HUD shows streak progress and the active reward.
+- Faster shots and keyboard aiming reduce target-switching delay. Low pressure retains enough jet speed and damage for a recovery kill.
+- Bowl flow earns 100 points per second; spills cost 35. Accuracy includes successful bowl and bug hits.
+- Reaction/streak rules use the `arcade-5` leaderboard. Older scores remain stored separately.
+
+## Local score storage
+
+Scores save automatically at the end of each round:
+
+- **SQLite:** `.data/aimlow.sqlite`, created automatically. Daily (UTC) and all-time boards show the top 50 scores for the current rules version.
+- **Browser backup:** the top 10 scores stay in versioned `localStorage`. A database error does not lose the visible result or stop the next round. The results screen offers a retry.
+- **Party standings:** an in-memory ranking for the current group of players.
+
+No scores are sent to a cloud service. The local app uses two same-origin endpoints:
+
+| Route                                         | Purpose                                        |
+| --------------------------------------------- | ---------------------------------------------- |
+| `POST /api/scores`                            | Validate and save a completed round to SQLite. |
+| `GET /api/leaderboard?period=daily\|all-time` | Read local SQLite rankings.                    |
+
+Queries are parameterized. A unique run ID makes retries idempotent; submitting different results with the same ID cannot overwrite an existing score. Request bodies and result sizes are bounded. Scores are casual and client-reported, not a competitive anti-cheat system.
+
+The database and its SQLite journal files are ignored by Git. To choose a different local file, copy `.env.example` to `.env` and set `AIMLOW_DB_PATH`. Stop the app before copying/removing its database files. No credentials, tokens, migrations to apply, or separate database process.
 
 ## Runtime design
 
 ```text
-+page.svelte          UI state, canvas ownership, mount/unmount
-  App                composition, startup, shutdown
-    AssetLoader      concurrent loading, progress, resource ownership
-    Camera           camera and OrbitControls
-    Renderer         GPU initialization, resize, render
-    Resize           viewport listener
-    InputController  keyboard state and focus-loss reset
-    Loop             cancellable animation frame scheduling
-    Physics          Rapier world, colliders, collision routing
-    World            fixed-step gameplay coordination
-      Environment    level geometry and actors
-      WaterJet       particle emission, scoring, instanced drawing
++page.svelte          UI flow, party turns, local results and SQLite save status
+  Hud / Scoreboard   Presentational components
+  App                Startup, input/audio wiring, UI snapshots, teardown
+    Session          Pure rules: phases, pressure, score, bowl streaks, power-ups, results
+    InputController  Canvas-relative pointer/touch + keyboard aim; focus loss
+    World            Bounded 60 Hz simulation, complete round reset
+      Environment    Static bathroom and inner catch sensor
+      WaterJet       Weighted droplets, one terminal outcome, instanced drawing
+      EnemyManager   Growing waves, free spawn lanes, deadlines, independent enemies
+      Physics        Rapier bodies, collider identities, collision outcomes
+    AssetLoader      Shared GLTF/texture ownership, cancellation-safe loading
+    Camera           Fixed, portrait-aware framing; no OrbitControls
+    Renderer / Loop  GPU lifecycle, bounded RAF scheduling
+server/ScoreDatabase  Local SQLite persistence, ranking, duplicate protection
 ```
 
-- Dependencies are constructor arguments. Runtime components do not import or
-  construct `App`; there is no application singleton or service locator.
-- `App.init()` waits for assets, physics, and the renderer before creating the
-  world. The start button appears only after all three are ready. Loading errors
-  are displayed instead of leaving the page stuck.
-- Physics and emission run at 60 Hz. Catch-up is capped at 100 ms per frame to
-  avoid large bursts after backgrounding. Particle matrices upload once per
-  rendered frame, after physics steps. Static meshes are not synchronized each step.
-- Svelte owns the loading/start overlay. Shared stores contain only keyboard
-  input and score, not services or initialization signals.
-- `App.dispose()` stops the loop, detaches listeners, disposes controls and
-  particles, frees Rapier memory, and releases shared GPU resources. Async work
-  that finishes after unmount is discarded and cleaned up.
+- Constructor injection, not a singleton, service locator, event bus, or ECS.
+- `Session` owns rules; the Svelte store receives snapshots at up to 30 Hz. No particle-level UI updates.
+- Physics runs at 60 Hz with at most 100 ms of catch-up. Particle matrices upload once per display frame.
+- Droplets retain stable IDs. Contacts resolve once, after Rapier has drained its events. Outer porcelain cannot award points.
+- Bugs clone skinned models and own animation mixers/material variants. Geometry and textures stay shared. One data-driven actor replaces duplicate Spider/Wasp classes.
+- Retry releases dynamic bodies, actors, sensors, and round state without reloading assets or recreating the renderer.
+- Settings affect presentation and keyboard speed, not scoring. Balance values live in `src/lib/Game/config.ts`.
+- The unused character-movement prototype and testing-only OrbitControls were removed.
 
-## Working on the code
+See [the gameplay plan](docs/AIMLOW_GAME_PLAN.md) for current rules and milestones. Balance and gameplay remain open for feedback.
 
-Read `AGENTS.md` and use `graphify-out/graph.json` for navigation when available.
-Application code is under `src/`; `static/draco/` is bundled vendor code.
+## Checks
 
-After changing rendering or lifecycle code, also check in a browser:
+`pnpm test` runs 28 focused Node tests using the existing esbuild dependency. This includes real Rapier simulation, animated spider grounding, wave growth/reset/pause, varied non-overlapping spawn lanes, outer-lane framing, quick-kill health and reaction windows, timed streak rewards at 30/60/120 Hz, streak interruption and cooldown, actual World-to-bowl reward integration, low-pressure shots, and temporary SQLite files for persistence, migration, ranking, duplicate protection, and result validation. No new testing framework or runtime database dependency.
 
-1. Loading completes and START begins the simulation.
-2. Pointer movement aims the jet and collisions change the score.
-3. Window resizing updates the canvas and camera.
-4. Unmounting during loading and mounting a fresh instance leave no stale loop
-   or event listeners.
+Earlier headless Chrome checks covered desktop/mobile layouts and the round lifecycle. Reaction/streak changes are covered by Node and physics tests; browser visual checks, actual phone/touch-device testing, and gameplay tuning remain separate.
 
-Three.js and Rapier still produce large production chunks. Rendering performance
-needs browser profiling before adding pooling, workers, or further abstractions.
+Three.js and Rapier still produce large production chunks. Profile before adding workers, pooling, or custom rendering infrastructure.
+
+## Working on this repository
+
+Read `AGENTS.md`; use `graphify-out/graph.json` for navigation. Application code is under `src/`. `static/draco/` remains bundled vendor code.
