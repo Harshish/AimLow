@@ -111,7 +111,8 @@ export class WaterJet {
 		this.physics.removeBody(particle.body);
 		this.particles.delete(id);
 	}
-	syncInstances() {
+	/** `offset` seconds shifts each droplet along its velocity to the render time between steps. */
+	syncInstances(offset = 0) {
 		let i = 0;
 		for (const { body } of this.particles.values()) {
 			const v = body.linvel();
@@ -121,11 +122,18 @@ export class WaterJet {
 				this.rotation.setFromUnitVectors(UP, this.direction.set(v.x, v.y, v.z).divideScalar(speed));
 			else this.rotation.identity();
 			this.scale.set(0.75, 1 + Math.min(2.4, speed * 0.09), 0.75);
-			this.matrix.compose(this.point.copy(body.translation()), this.rotation, this.scale);
+			this.point
+				.copy(body.translation())
+				.addScaledVector(this.direction.set(v.x, v.y, v.z), offset);
+			this.matrix.compose(this.point, this.rotation, this.scale);
 			this.particlesMesh.setMatrixAt(i++, this.matrix);
 		}
 		this.particlesMesh.count = i;
-		this.particlesMesh.instanceMatrix.needsUpdate = true;
+		// Upload only live droplets; menus and breaks draw nothing and upload nothing.
+		if (i) {
+			this.particlesMesh.instanceMatrix.addUpdateRange(0, i * 16);
+			this.particlesMesh.instanceMatrix.needsUpdate = true;
+		}
 	}
 	reset() {
 		for (const id of this.particles.keys()) this.remove(id);

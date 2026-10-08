@@ -26,7 +26,7 @@ export default class Renderer {
 	) {
 		this.instance = new THREE.WebGPURenderer({ canvas, antialias: false });
 		this.instance.toneMapping = THREE.ACESFilmicToneMapping;
-		this.instance.toneMappingExposure = 1.05;
+		this.instance.toneMappingExposure = 0.7;
 		this.instance.setClearColor(0x121a26);
 		this.instance.shadowMap.enabled = true;
 		this.instance.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -78,7 +78,7 @@ export default class Renderer {
 	private compose() {
 		for (const effect of this.effects) effect.dispose();
 		const color = this.scenePass.getTextureNode('output');
-		const glow = bloom(color, 0.1, 0.35, 0.62);
+		const glow = bloom(color, 0.05, 0.35, 0.62);
 		this.effects = [glow];
 		let output = color.add(glow);
 		if (this.haze) this.haze.light.castShadow = this.high;
@@ -87,7 +87,7 @@ export default class Renderer {
 			layers.set(HAZE_LAYER);
 			const volume = pass(this.scene, this.camera, { depthBuffer: false });
 			volume.setLayers(layers);
-			volume.setResolutionScale(0.25);
+			volume.setResolutionScale(0.1);
 			// Occlude the beam behind porcelain and bugs using the main pass depth.
 			this.haze.material.depthNode = this.scenePass.getTextureNode('depth').sample(screenUV);
 			this.haze.material.needsUpdate = true;

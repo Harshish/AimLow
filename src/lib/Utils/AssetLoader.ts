@@ -1,20 +1,16 @@
 import * as THREE from 'three/webgpu';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
-import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { assetsToLoad, type LoadedAssets } from './Assets';
 import { disposeResources } from './disposeResources';
 
 export default class AssetLoader {
-	private readonly draco = new DRACOLoader().setDecoderPath('/draco/');
-	private readonly models = new GLTFLoader().setDRACOLoader(this.draco);
+	private readonly models = new GLTFLoader();
 	private readonly textures = new THREE.TextureLoader();
 	private readonly resources: (THREE.Object3D | THREE.Texture)[] = [];
 	private disposed = false;
-	private pending = 0;
 
 	async load(onProgress: (progress: number) => void): Promise<LoadedAssets> {
 		let loaded = 0;
-		this.pending = assetsToLoad.length;
 		const entries = await Promise.all(
 			assetsToLoad.map(async (asset) => {
 				try {
@@ -32,9 +28,6 @@ export default class AssetLoader {
 					return [asset.id, value];
 				} catch (error) {
 					throw new Error(`Failed to load ${asset.path}`, { cause: error });
-				} finally {
-					this.pending--;
-					if (this.disposed && this.pending === 0) this.draco.dispose();
 				}
 			})
 		);
@@ -47,7 +40,5 @@ export default class AssetLoader {
 		this.disposed = true;
 		disposeResources([scene, ...this.resources]);
 		this.resources.length = 0;
-		// Do not terminate Draco workers while a pending decode still needs them.
-		if (this.pending === 0) this.draco.dispose();
 	}
 }

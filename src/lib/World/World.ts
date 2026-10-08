@@ -65,11 +65,13 @@ export default class World {
 			this.accumulator = 0;
 			return;
 		}
-		this.accumulator += Math.max(0, Math.min(delta, 0.1));
+		const frame = Math.max(0, Math.min(delta, 0.1));
+		// Keyboard aim moves per display frame so the reticle is as smooth as the screen allows.
+		if (this.session.playing) this.input.update(frame);
+		this.accumulator += frame;
 		while (this.accumulator + 1e-9 >= STEP) {
 			this.accumulator -= STEP;
 			if (this.session.playing) {
-				this.input.update(STEP);
 				this.enemies.update(STEP, settings.reducedMotion);
 				const state = this.session.state;
 				this.waterJet.update(
@@ -96,7 +98,11 @@ export default class World {
 				if (this.session.state.phase === 'results') this.waterJet.reset();
 			}
 		}
-		this.waterJet.syncInstances();
+		// Rules tick at a fixed 60 Hz; draw between the last two steps so bugs and droplets
+		// move every display frame (120/144 Hz and up) instead of judder on step boundaries.
+		const alpha = this.accumulator / STEP;
+		this.enemies.render(alpha);
+		this.waterJet.syncInstances((alpha - 1) * STEP);
 		this.reticle.position.copy(this.input.aim);
 		this.reticle.quaternion.copy(this.camera.quaternion);
 	}
@@ -128,6 +134,22 @@ export default class World {
 			light.color.lerp(ALARM, Math.min(1, this.alarm * 2));
 		}
 	}
+	/**
+	 * Draws one frame with everything that otherwise first appears mid-play (bugs, bars, sparks,
+	 * score popup, stream, reticle), so shaders compile behind the loading screen, not on a kill.
+	 * Gameplay state is untouched; the next loop() restores reticle visibility.
+	 */
+	prewarm(render: () => void) {
+		this.enemies.showTemplates(true);
+		this.effects.kill({ x: 0, y: 5, z: 5 }, 'wasp', true, 0, false);
+		this.effects.update(0.2);
+		this.waterJet.particlesMesh.count = 1;
+		this.reticle.visible = true;
+		render();
+		this.enemies.showTemplates(false);
+		this.effects.reset();
+		this.waterJet.syncInstances();
+	}
 	reset() {
 		this.waterJet.reset();
 		this.enemies.reset();
@@ -138,6 +160,7 @@ export default class World {
 	}
 	dispose() {
 		this.reset();
+		this.enemies.dispose();
 		this.waterJet.dispose();
 		this.effects.dispose();
 		this.scene.remove(this.reticle);

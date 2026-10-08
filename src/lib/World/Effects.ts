@@ -4,6 +4,7 @@ import type { BugKind } from '../Game/config';
 export const MAX_SPARKS = 768;
 const GRAVITY = 22;
 const POPUP_LIFE = 0.9;
+const POPUPS = 4;
 // HDR tints: values above 1 feed the bloom pass so impacts glow briefly.
 const GORE: Record<BugKind, number[]> = {
 	wasp: [0xffc640, 0xfff3a0],
@@ -12,6 +13,12 @@ const GORE: Record<BugKind, number[]> = {
 const FAST = 0xff6a3d;
 
 type Point = { x: number; y: number; z: number };
+type Popup = {
+	sprite: THREE.Sprite;
+	material: THREE.SpriteMaterial;
+	ctx: CanvasRenderingContext2D;
+	age: number;
+};
 type Burst = {
 	speed?: number;
 	up?: number;
@@ -32,8 +39,8 @@ export default class Effects {
 	private readonly size = new Float32Array(MAX_SPARKS);
 	private readonly gravity = new Float32Array(MAX_SPARKS);
 	private readonly colors = new Float32Array(MAX_SPARKS * 3);
-	private readonly popups: { sprite: THREE.Sprite; material: THREE.SpriteMaterial; age: number }[] =
-		[];
+	private readonly popups: Popup[] = [];
+	private nextPopup = 0;
 	private readonly matrix = new THREE.Matrix4();
 	private readonly color = new THREE.Color();
 
@@ -139,14 +146,19 @@ export default class Effects {
 			this.sparks.setMatrixAt(i, this.matrix);
 		}
 		this.sparks.count = this.count;
-		this.sparks.instanceMatrix.needsUpdate = true;
-		this.sparks.instanceColor!.needsUpdate = true;
-		for (let i = this.popups.length - 1; i >= 0; i--) {
-			const popup = this.popups[i];
+		// Upload only live sparks; idle frames draw nothing and upload nothing.
+		if (this.count) {
+			this.sparks.instanceMatrix.addUpdateRange(0, this.count * 16);
+			this.sparks.instanceColor!.addUpdateRange(0, this.count * 3);
+			this.sparks.instanceMatrix.needsUpdate = true;
+			this.sparks.instanceColor!.needsUpdate = true;
+		}
+		for (const popup of this.popups) {
+			if (!popup.sprite.visible) continue;
 			popup.age += dt;
 			const t = popup.age / POPUP_LIFE;
 			if (t >= 1) {
-				this.dropPopup(i);
+				popup.sprite.visible = false;
 				continue;
 			}
 			// Overshoot in, drift up, fade out: readable at a glance, gone before the next kill.
@@ -158,10 +170,16 @@ export default class Effects {
 	}
 	reset() {
 		this.count = this.sparks.count = 0;
-		while (this.popups.length) this.dropPopup(this.popups.length - 1);
+		for (const { sprite } of this.popups) sprite.visible = false;
 	}
 	dispose() {
 		this.reset();
+		for (const { sprite, material } of this.popups) {
+			this.scene.remove(sprite);
+			material.map?.dispose();
+			material.dispose();
+		}
+		this.popups.length = 0;
 		this.scene.remove(this.sparks);
 		this.sparks.geometry.dispose();
 		(this.sparks.material as THREE.Material).dispose();
@@ -183,6 +201,24 @@ export default class Effects {
 	private popup(at: Point, text: string, fill: string) {
 		// Canvas text needs a DOM; headless runs simply skip the popup.
 		if (typeof document === 'undefined' || typeof document.createElement !== 'function') return;
+		// A small ring of reused sprites: the material stays compiled, so kills never rebuild shaders.
+		const slot = this.nextPopup++ % POPUPS;
+		const popup = this.popups[slot] ?? this.createPopup();
+		if (!popup) return;
+		this.popups[slot] = popup;
+		const { ctx, sprite, material } = popup;
+		ctx.clearRect(0, 0, 256, 96);
+		ctx.strokeText(text, 128, 50);
+		ctx.fillStyle = fill;
+		ctx.fillText(text, 128, 50);
+		material.map!.needsUpdate = true;
+		material.opacity = 1;
+		sprite.scale.set(0, 0, 1);
+		sprite.position.set(at.x, at.y + 1.6, at.z);
+		sprite.visible = true;
+		popup.age = 0;
+	}
+	private createPopup(): Popup | undefined {
 		const canvas = document.createElement('canvas');
 		canvas.width = 256;
 		canvas.height = 96;
@@ -194,9 +230,6 @@ export default class Effects {
 		ctx.lineJoin = 'round';
 		ctx.lineWidth = 12;
 		ctx.strokeStyle = '#101c28';
-		ctx.strokeText(text, 128, 50);
-		ctx.fillStyle = fill;
-		ctx.fillText(text, 128, 50);
 		const map = new THREE.CanvasTexture(canvas);
 		map.colorSpace = THREE.SRGBColorSpace;
 		const material = new THREE.SpriteMaterial({
@@ -207,14 +240,7 @@ export default class Effects {
 		});
 		const sprite = new THREE.Sprite(material);
 		sprite.renderOrder = 6;
-		sprite.position.set(at.x, at.y + 1.6, at.z);
 		this.scene.add(sprite);
-		this.popups.push({ sprite, material, age: 0 });
-	}
-	private dropPopup(i: number) {
-		const [{ sprite, material }] = this.popups.splice(i, 1);
-		this.scene.remove(sprite);
-		material.map?.dispose();
-		material.dispose();
+		return { sprite, material, ctx, age: 0 };
 	}
 }

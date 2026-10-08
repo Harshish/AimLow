@@ -32,6 +32,7 @@ export default class Enemy {
 		depthTest: false
 	});
 	private readonly position = new THREE.Vector3();
+	private readonly previous = new THREE.Vector3();
 	private readonly groundHeight: number;
 	private readonly inward = Math.random() < 0.5;
 	private readonly motionPhase = Math.random() * Math.PI * 2;
@@ -111,6 +112,7 @@ export default class Enemy {
 		this.healthBar.rotation.x = this.timerBar.rotation.x = -Math.atan2(0.8, 0.6);
 		this.root.add(this.healthBar, this.timerBar);
 		this.move();
+		this.previous.copy(this.position);
 		this.root.position.copy(this.position);
 		scene.add(this.root);
 		this.body = physics.add(
@@ -186,6 +188,9 @@ export default class Enemy {
 		}
 	}
 	update(dt: number, reducedMotion: boolean) {
+		// Steps start from the simulated pose; render() only blends what is drawn between steps.
+		this.previous.copy(this.position);
+		this.root.position.copy(this.position);
 		if (this.status === 'dead' || this.status === 'escaped') {
 			this.retiredFor += dt;
 			this.mixer.update(dt);
@@ -216,6 +221,9 @@ export default class Enemy {
 				lit.emissiveIntensity = hit ? 0.6 : this.fast ? 0.5 : this.kind === 'spider' ? 0.2 : 0.05;
 			}
 		}
+	}
+	render(alpha: number) {
+		this.root.position.lerpVectors(this.previous, this.position, alpha);
 	}
 	damage(amount: number) {
 		if (!this.active) return false;

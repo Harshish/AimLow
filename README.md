@@ -101,4 +101,4 @@ Three.js and Rapier still produce large production chunks. Profile before adding
 
 ## Working on this repository
 
-Read `AGENTS.md`; use `graphify-out/graph.json` for navigation. Application code is under `src/`. `static/draco/` remains bundled vendor code.
+Read `AGENTS.md`; use `graphify-out/graph.json` for navigation. Application code is under `src/`. Models are plain glTF binaries (no Draco or Meshopt decoder); `spider.glb` uses WebP textures (`EXT_texture_webp`).

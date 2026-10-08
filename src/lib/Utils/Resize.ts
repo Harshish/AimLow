@@ -6,7 +6,7 @@ export default class Resize {
 		this.update();
 	}
 
-	private update = () => {
+	update = () => {
 		this.resize(
 			Math.max(window.innerWidth, 1),
 			Math.max(window.innerHeight, 1),

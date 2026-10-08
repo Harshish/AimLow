@@ -19,13 +19,11 @@
   - `src/lib/World/World.ts`
   - `src/lib/World/Physics.ts`
   - `src/lib/Utils/AssetLoader.ts`
-- Treat `static/draco/` as bundled vendor/generated code unless task explicitly mentions Draco internals.
 - Ignore `node_modules/` and `.svelte-kit/` unless task explicitly targets build tooling or generated output.
 
 ## Search policy
 
 - Do not start with blind repo-wide grep when graph already answers structure question.
-- If graph results are noisy because of Draco bundles, constrain follow-up reads/searches to `src/` first.
 - For impact analysis, use graph relationships first, then confirm with file reads.
 
 ## After edits

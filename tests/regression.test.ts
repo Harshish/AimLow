@@ -438,7 +438,7 @@ test('real world bowl contacts charge a streak reward without collectible cans',
 	mockGlobal(t, 'document', new EventTarget());
 	const loader = new GLTFLoader();
 	loader.register((parser) => {
-		parser.loadTexture = async () => new THREE.Texture();
+		parser.loadTextureImage = async () => new THREE.Texture();
 		return { name: 'test-textures' };
 	});
 	const file = readFileSync('static/models/urinal.glb');
@@ -555,9 +555,11 @@ test('hero spotlight shadows the bowl through haze while lane lights keep bugs r
 	}
 });
 
-test('effects pool sparks, settle on the floor, expire, and release popups', (t) => {
+test('effects pool sparks and popups, settle on the floor, expire, and release on dispose', (t) => {
 	const scene = new THREE.Scene();
 	const effects = new Effects(scene);
+	const disposed: string[] = [];
+	const sprites = () => scene.children.filter((child) => child instanceof THREE.Sprite);
 	try {
 		effects.burst({ x: 0, y: 0.05, z: 5 }, 40, 0xffffff, { speed: 8, up: -1, life: 0.6 });
 		assert.equal(effects.active, 40);
@@ -574,9 +576,8 @@ test('effects pool sparks, settle on the floor, expire, and release popups', (t)
 		assert.equal(effects.active, MAX_SPARKS, 'the pool never grows');
 		effects.reset();
 		effects.kill({ x: 0, y: 5, z: 5 }, 'wasp', true, 412, true);
-		assert.equal(scene.children.filter((child) => child instanceof THREE.Sprite).length, 0);
+		assert.equal(sprites().length, 0);
 
-		const disposed: string[] = [];
 		mockGlobal(t, 'document', {
 			createElement: () => ({
 				width: 0,
@@ -585,7 +586,7 @@ test('effects pool sparks, settle on the floor, expire, and release popups', (t)
 			})
 		});
 		effects.kill({ x: 0, y: 5, z: 5 }, 'spider', false, 150, false);
-		const popup = scene.children.find((child) => child instanceof THREE.Sprite) as THREE.Sprite;
+		const popup = sprites().find((sprite) => sprite.visible) as THREE.Sprite;
 		assert.ok(popup, 'kills show their points where the bug died');
 		popup.material.addEventListener('dispose', () => disposed.push('material'));
 		popup.material.map!.addEventListener('dispose', () => disposed.push('texture'));
@@ -593,12 +594,19 @@ test('effects pool sparks, settle on the floor, expire, and release popups', (t)
 		effects.update(0.3);
 		assert.ok(popup.position.y > start, 'popups drift upward');
 		effects.update(1);
-		assert.equal(scene.children.includes(popup), false);
-		assert.deepEqual(disposed.sort(), ['material', 'texture']);
+		assert.equal(popup.visible, false, 'expired popups hide');
+		// Reusing sprites keeps their compiled material alive: kills never rebuild shaders.
+		for (let i = 0; i < 20; i++) effects.kill({ x: 0, y: 5, z: 5 }, 'wasp', false, 150, false);
+		const pooled = sprites().length;
+		for (let i = 0; i < 20; i++) effects.kill({ x: 0, y: 5, z: 5 }, 'wasp', false, 150, false);
+		assert.equal(sprites().length, pooled, 'kills reuse a fixed pool of popups');
+		assert.deepEqual(disposed, [], 'pooled popups are not released mid-round');
 	} finally {
 		effects.dispose();
 	}
 	assert.equal(scene.children.includes(effects.sparks), false);
+	assert.equal(sprites().length, 0);
+	assert.deepEqual(disposed.sort(), ['material', 'texture']);
 });
 
 test('camera shake decays back to the framed position and respects reduced motion', (t) => {
@@ -758,7 +766,7 @@ test('animated spider feet stay on the floor and the stream can hit their collid
 	const loader = new GLTFLoader();
 	// Keep the real rig and animation; textures need a browser and do not affect grounding.
 	loader.register((parser) => {
-		parser.loadTexture = async () => new THREE.Texture();
+		parser.loadTextureImage = async () => new THREE.Texture();
 		return { name: 'test-textures' };
 	});
 	const file = readFileSync('static/models/spider.glb');
@@ -815,7 +823,7 @@ test('jet captures the inner bowl at varied angles and rescues low pressure in e
 	t.mock.method(Math, 'random', () => (seed = (1664525 * seed + 1013904223) >>> 0) / 2 ** 32);
 	const loader = new GLTFLoader();
 	loader.register((parser) => {
-		parser.loadTexture = async () => new THREE.Texture();
+		parser.loadTextureImage = async () => new THREE.Texture();
 		return { name: 'test-textures' };
 	});
 	const [urinal, spider, wasp] = await Promise.all(
@@ -1188,6 +1196,41 @@ test('enemies clone independently, reward final-tick kills once, and penalize ti
 	}
 });
 
+test('bug templates stay compiled across resets, never collide, and free on dispose', async () => {
+	const scene = new THREE.Scene(),
+		physics = await Physics.create();
+	const bug = model();
+	bug.scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial()));
+	const manager = new EnemyManager(
+		scene,
+		physics,
+		{ spider: bug, wasp: bug } as LoadedAssets,
+		new Session()
+	);
+	let disposals = 0;
+	try {
+		manager.showTemplates(true);
+		manager.showTemplates(false);
+		manager.showTemplates(true);
+		assert.equal(scene.children.length, 2, 'one template per kind, created once');
+		assert.equal(physics.colliderMap.size, 0, 'templates never intercept droplets');
+		for (const root of scene.children)
+			root.traverse((object) => {
+				const material = (object as THREE.Mesh).material as THREE.Material | undefined;
+				material?.addEventListener('dispose', () => disposals++);
+			});
+		manager.reset();
+		assert.equal(disposals, 0, 'round resets keep template materials and their shaders');
+		manager.dispose();
+		assert.ok(disposals > 0);
+		assert.equal(scene.children.length, 0);
+	} finally {
+		manager.dispose();
+		physics.dispose();
+		disposeResources([bug.scene]);
+	}
+});
+
 test('waves grow, vary spawn lanes, wait between waves, and reset cleanly', async (t) => {
 	let seed = 42;
 	t.mock.method(Math, 'random', () => (seed = (1664525 * seed + 1013904223) >>> 0) / 2 ** 32);
@@ -1367,7 +1410,7 @@ test('all movement patterns stay framed, face correctly, and remain reachable by
 	const camera = new Camera();
 	const loader = new GLTFLoader();
 	loader.register((parser) => {
-		parser.loadTexture = async () => new THREE.Texture();
+		parser.loadTextureImage = async () => new THREE.Texture();
 		return { name: 'test-textures' };
 	});
 	const assets = await Promise.all(

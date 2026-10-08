@@ -6,19 +6,24 @@ export default class Audio {
 	private context?: AudioContext;
 	private noise?: AudioBuffer;
 	private hiss?: GainNode;
+	private hissLevel = 0;
 	private nextBeat = 0;
 	private beat = 0;
 	settings: Settings;
 	constructor(settings: Settings) {
 		this.settings = settings;
 	}
-	unlock() {
+	/** Creating a context blocks ~100 ms; do it while loading so the play click only resumes it. */
+	prepare() {
 		try {
 			this.context ??= new AudioContext();
-			void this.context.resume().catch(() => {});
 		} catch {
 			/* Audio is optional. */
 		}
+	}
+	unlock() {
+		this.prepare();
+		void this.context?.resume().catch(() => {});
 	}
 	private get running() {
 		return this.context?.state === 'running' ? this.context : undefined;
@@ -105,7 +110,11 @@ export default class Audio {
 				source.start();
 			}
 			const level = this.settings.sound && flowing && phase === 'playing' ? 0.022 : 0;
-			this.hiss.gain.setTargetAtTime(level, context.currentTime, 0.08);
+			// Schedule on change only; a per-frame automation event just grows the param timeline.
+			if (level !== this.hissLevel) {
+				this.hissLevel = level;
+				this.hiss.gain.setTargetAtTime(level, context.currentTime, 0.08);
+			}
 		}
 		if (!context || !this.settings.music || phase !== 'playing') {
 			this.nextBeat = 0;

@@ -19,6 +19,8 @@ import type Effects from './Effects';
 
 export default class EnemyManager {
 	readonly enemies = new Map<number, Enemy>();
+	/** One hidden, bodiless bug per kind. Never despawned, so their compiled shaders are never freed. */
+	private readonly templates: Enemy[] = [];
 	private nextSpawn = 0;
 	private nextWaveAt: number | null = WAVE_BREAK;
 	private pending = 0;
@@ -96,6 +98,20 @@ export default class EnemyManager {
 			this.session.endWave();
 		}
 	}
+	/** Shows (or hides) the templates; drawing them once compiles every bug material before play. */
+	showTemplates(visible: boolean) {
+		if (!this.templates.length)
+			for (const kind of ['spider', 'wasp'] as const) {
+				const lane = ENEMY_LANES.findIndex((lane) => lane.kind === kind);
+				const template = new Enemy(-1, kind, this.assets[kind], this.scene, this.physics, lane);
+				this.physics.removeBody(template.body);
+				this.templates.push(template);
+			}
+		for (const template of this.templates) template.root.visible = visible;
+	}
+	render(alpha: number) {
+		for (const enemy of this.enemies.values()) enemy.render(alpha);
+	}
 	resolveAim(aim: THREE.Vector3, camera: THREE.Camera) {
 		// Keep the cursor's screen direction, but shoot at the depth of the bug under it.
 		// This works for pointer, touch, and keyboard without snapping sideways to targets.
@@ -146,5 +162,10 @@ export default class EnemyManager {
 		this.pending = 0;
 		this.sequence = 0;
 		this.locked = false;
+	}
+	dispose() {
+		this.reset();
+		for (const template of this.templates) template.dispose();
+		this.templates.length = 0;
 	}
 }

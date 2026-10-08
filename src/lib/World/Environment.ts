@@ -29,7 +29,7 @@ export default class Environment {
 		scene.add(key);
 
 		// High and to the left: a visible diagonal beam and a long shadow across the bricks.
-		this.hero = new THREE.SpotLight(0xfff1dc, 3200, 70, 0.32, 0.55, 2);
+		this.hero = new THREE.SpotLight(0xfff1dc, 2000, 70, 0.32, 0.55, 2);
 		this.hero.position.set(-7, 30, 10);
 		this.hero.target.position.set(0.2, 7, 4);
 		this.hero.castShadow = true;
@@ -43,7 +43,7 @@ export default class Environment {
 			[0x26d9ff, -1],
 			[0xff3fa4, 1]
 		]) {
-			const light = new THREE.SpotLight(hex, 2900, 90, Math.PI / 7, 0.8, 2);
+			const light = new THREE.SpotLight(hex, 3000, 90, Math.PI / 7, 0.8, 2);
 			light.position.set(side * 14, 34, 16);
 			light.target.position.set(side * 8, 5, 5.5);
 			scene.add(light, light.target);

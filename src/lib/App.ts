@@ -70,7 +70,8 @@ export default class App {
 			}
 			this.audio.update(phase, this.session.state.pressure > 0);
 			this.publishedAt += dt;
-			if (this.publishedAt >= 1 / 30) {
+			// Only the HUD needs a steady feed; other screens change on phase transitions.
+			if ((phase === 'playing' || phase === 'countdown') && this.publishedAt >= 1 / 30) {
 				this.publish();
 				this.publishedAt = 0;
 			}
@@ -103,6 +104,9 @@ export default class App {
 			);
 			const { haze, hero } = this.world.environment;
 			this.renderer.setHaze(haze.material, hero);
+			this.prewarm();
+			// Starts suspended (no gesture yet); the play click resumes it without a stall.
+			this.audio.prepare();
 			this.loop.start();
 		} catch (error) {
 			if (!this.disposed) {
@@ -138,15 +142,20 @@ export default class App {
 		this.publish();
 	}
 	setSettings(settings: Settings) {
+		const qualityChanged = settings.quality !== this.settings.quality;
 		this.settings = { ...settings };
 		this.audio.settings = this.settings;
 		this.input.sensitivity = settings.sensitivity;
 		this.renderer.setQuality(settings.quality);
-		this.renderer.resize(
-			window.innerWidth,
-			window.innerHeight,
-			Math.min(window.devicePixelRatio || 1, settings.quality === 'low' ? 1 : 1.5)
-		);
+		// Only quality changes the pixel ratio; toggles and sliders must not reallocate GPU targets.
+		if (qualityChanged) {
+			this.resize.update();
+			// Quality toggles the hero shadow, which changes every lit shader: rebuild them now.
+			this.prewarm();
+		}
+	}
+	private prewarm() {
+		this.world?.prewarm(() => this.renderer.loop());
 	}
 	/** Kill and escape impacts: screen shake, a wet splat, and a buzz on phones. */
 	private feedback() {

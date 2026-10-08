@@ -11,6 +11,7 @@
 		QUICK_KILL_WINDOW
 	} from '$lib/Game/config';
 	import { loadSettings, saveSettings } from '$lib/Game/settings';
+	import { assetsToLoad } from '$lib/Utils/Assets';
 	import {
 		loadScores,
 		saveScore,
@@ -230,6 +231,15 @@
 		content="Keep it in the bowl. Blast the bugs. Don’t run dry. A ridiculous, free arcade party game."
 	/>
 	<meta name="theme-color" content="#101c28" />
+	<!-- Start downloads with the HTML, not after the engine bundle boots. Matches loader requests. -->
+	{#each assetsToLoad as asset (asset.id)}
+		<link
+			rel="preload"
+			href={asset.path}
+			as={asset.type === 'model' ? 'fetch' : 'image'}
+			crossorigin="anonymous"
+		/>
+	{/each}
 </svelte:head>
 
 <main
