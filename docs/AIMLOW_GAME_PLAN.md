@@ -16,7 +16,7 @@ The tone is cartoon bathroom chaos, not realistic anatomy. Fast restarts, readab
 - Mouse, touch, and keyboard aiming; continuous emission during play.
 - Animated spiders and wasps with timed spawns, health, deaths, and timeout penalties.
 - Accurate containment/spill scoring and a pressure-based round timer.
-- Two drink power-ups: beer-style and cola-style.
+- Two drink power-ups: beer-style and coffee-style.
 - Arcade menu, HUD, pause, results, and immediate retry.
 - Local SQLite leaderboard, browser score backup, and same-device party play. No cloud database or launch work.
 - No OrbitControls in the shipped game.
@@ -167,10 +167,10 @@ Spawning → Active → Dying → Removed
 
 Use fictional parody labels, not real drink brands. Start with two clear trade-offs:
 
-| Drink                       | Jet change                                                                                | Color/readability                             | Duration  |
-| --------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------- | --------- |
-| **Foam Party** — beer-style | 1.4× launch speed; 3× spread. Easier crowd coverage, harder clean containment.            | Bright golden yellow, bubbly pickup icon      | 8 seconds |
-| **Cola Laser** — cola-style | 1.1× launch speed; 0.25× spread; narrower visual stream. Better precision, less coverage. | Amber/gold with a distinct narrow-stream icon | 8 seconds |
+| Drink                           | Jet change                                                                                | Color/readability                             | Duration  |
+| ------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------- | --------- |
+| **Foam Party** — beer-style     | 1.4× launch speed; 3× spread. Easier crowd coverage, harder clean containment.            | Bright golden yellow, bubbly pickup icon      | 8 seconds |
+| **Coffee Laser** — coffee-style | 1.1× launch speed; 0.25× spread; narrower visual stream. Better precision, less coverage. | Amber/gold with a distinct narrow-stream icon | 8 seconds |
 
 - Normal gameplay uses a pale-yellow pee stream rather than the current blue water appearance.
 - “Force” means launch speed/trajectory and stream feel here; it does not increase droplet mass or require a new fluid solver.
@@ -308,10 +308,10 @@ Build in this order. Each milestone should produce something playable or indepen
 ### Milestone 4 — Drink variety
 
 - [x] Add timed pickup spawns and hit-to-collect behavior.
-- [x] Implement Foam Party and Cola Laser jet profiles and colors.
+- [x] Implement Foam Party and Coffee Laser jet profiles and colors.
 - [x] Add effect duration, replacement/refresh rules, and active-drink HUD feedback.
 
-**Exit check:** Beer is visibly stronger, wider, and yellow; cola is thin and focused. Expiry/replacement restores correct values, low pressure still applies, and neither drink prevents game over.
+**Exit check:** Beer is visibly stronger, wider, and yellow; coffee is thin and focused. Expiry/replacement restores correct values, low pressure still applies, and neither drink prevents game over.
 
 ### Milestone 5 — Party-ready arcade package
 
@@ -384,7 +384,7 @@ pnpm build
 | 1. Animate/spawn spiders and wasps; jet damage, death, score                | Section 4.3; Milestone 3      |
 | 2. Score inside the urinal; penalize particles falling out                  | Section 4.1; Milestone 2      |
 | 3. Full starting gauge, gradual pressure loss, weak/empty stream, game over | Section 4.2; Milestone 1      |
-| 4. Beer/cola-style power-ups change force, spread, and color                | Section 4.4; Milestone 4      |
+| 4. Beer/coffee-style power-ups change force, spread, and color              | Section 4.4; Milestone 4      |
 | 5. Unresolved bugs significantly reduce pressure                            | Sections 4.2–4.3; Milestone 3 |
 | 6. Pee-themed party game with a strong menu and shareability                | Sections 1 and 5; Milestone 5 |
 | 7. Arcade game with leaderboard                                             | Sections 5–6; Milestones 5–6  |

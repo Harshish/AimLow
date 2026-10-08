@@ -10,6 +10,8 @@ import {
 	waveProfile,
 	SCORE_PER_FLOW,
 	SPILL_PENALTY_PER_FLOW,
+	QUICK_KILL_WINDOW,
+	killReward,
 	type BugKind,
 	type DrinkKind
 } from './config';
@@ -22,7 +24,7 @@ export type RoundResult = Readonly<{
 	duration: number;
 	missed: number;
 }>;
-export type Notice = { id: number; text: string; tone: 'good' | 'bad' | 'drink' };
+export type Notice = { id: number; text: string; tone: 'good' | 'bad' | 'drink' | 'quick' };
 export type GameState = {
 	phase: Phase;
 	score: number;
@@ -37,6 +39,7 @@ export type GameState = {
 	wave: number;
 	waveRemaining: number;
 	bowlStreak: number;
+	fastestKill: number | null;
 	drink: { kind: DrinkKind; remaining: number } | null;
 	notice: Notice | null;
 	result: RoundResult | null;
@@ -56,6 +59,7 @@ export function initialState(): GameState {
 		wave: 0,
 		waveRemaining: 0,
 		bowlStreak: 0,
+		fastestKill: null,
 		drink: null,
 		notice: null,
 		result: null
@@ -152,15 +156,17 @@ export default class Session {
 		this.state.wave++;
 		this.state.waveRemaining = count;
 		const warning =
-			this.state.wave === 3
-				? 'WASPS NOW DART'
-				: this.state.wave === 4
-					? 'WATCH THE BACK ROW'
-					: this.state.wave === 7
-						? 'SPIDERS FROM ABOVE'
-						: this.state.wave > 1
-							? 'PRESSURE RISING'
-							: '';
+			this.state.wave === 2
+				? 'GLOWING BUGS ARE FAST'
+				: this.state.wave === 3
+					? 'WASPS NOW DART'
+					: this.state.wave === 4
+						? 'WATCH THE BACK ROW'
+						: this.state.wave === 7
+							? 'SPIDERS FROM ABOVE'
+							: this.state.wave > 1
+								? 'PRESSURE RISING'
+								: '';
 		this.announce(
 			`WAVE ${this.state.wave} · ${count} BUGS INCOMING!${warning ? ` · ${warning}` : ''}`,
 			'good'
@@ -170,15 +176,19 @@ export default class Session {
 		if (!this.playing) return;
 		this.announce(`WAVE ${this.state.wave} COMPLETE · CATCH YOUR BREATH!`, 'good');
 	}
-	kill(kind: BugKind) {
+	/** `reaction` is seconds since the bug appeared; faster bugs and reactions pay more. */
+	kill(kind: BugKind, speed = 1, reaction = QUICK_KILL_WINDOW) {
 		if (!this.playing) return;
+		const points = killReward(kind, speed, reaction);
+		const quick = reaction <= QUICK_KILL_WINDOW / 2;
 		this.state.kills++;
 		this.state.waveRemaining = Math.max(0, this.state.waveRemaining - 1);
-		this.state.score += BUGS[kind].reward;
+		this.state.score += points;
+		this.state.fastestKill = Math.min(this.state.fastestKill ?? Infinity, reaction);
 		this.state.pressure = Math.min(100, this.state.pressure + KILL_PRESSURE_GAIN);
 		this.announce(
-			`+${BUGS[kind].reward} · +${KILL_PRESSURE_GAIN}% PRESSURE · ${kind === 'wasp' ? 'BUZZ OFF!' : 'EIGHT LEGS. ZERO CHANCE.'}`,
-			'good'
+			`+${points} · ${reaction.toFixed(2)}s ${quick ? 'QUICK KILL!' : kind === 'wasp' ? 'BUZZ OFF!' : 'EIGHT LEGS. ZERO CHANCE.'} · +${KILL_PRESSURE_GAIN}% PRESSURE`,
+			quick ? 'quick' : 'good'
 		);
 	}
 	miss(kind: BugKind) {
@@ -190,7 +200,7 @@ export default class Session {
 	}
 	private awardPowerup() {
 		const kind = this.nextDrink;
-		this.nextDrink = kind === 'beer' ? 'cola' : 'beer';
+		this.nextDrink = kind === 'beer' ? 'coffee' : 'beer';
 		this.resetStreak();
 		this.state.drink = { kind, remaining: POWERUP_DURATION };
 		this.state.pressure = Math.min(100, this.state.pressure + DRINK_PRESSURE_GAIN);

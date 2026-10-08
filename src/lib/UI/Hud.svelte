@@ -46,7 +46,7 @@
 </div>
 <div class="game-bottom">
 	{#if state.drink}<div class="drink-badge">
-			<span>{state.drink.kind === 'beer' ? '◉' : '↗'}</span>
+			<span aria-hidden="true">{state.drink.kind === 'beer' ? '◉' : '☕'}</span>
 			<div>
 				<b>{DRINKS[state.drink.kind].name}</b><small
 					>{state.drink.remaining.toFixed(1)}s · {state.drink.kind === 'beer'
@@ -76,7 +76,12 @@
 	<div class="kill-count"><b>{state.kills}</b> BUGS BLASTED</div>
 </div>
 {#if state.notice}
-	{#key state.notice.id}<div class="notice" class:bad={state.notice.tone === 'bad'} role="status">
+	{#key state.notice.id}<div
+			class="notice"
+			class:bad={state.notice.tone === 'bad'}
+			class:quick={state.notice.tone === 'quick'}
+			role="status"
+		>
 			{state.notice.text}
 		</div>{/key}
 {/if}
@@ -245,6 +250,9 @@
 	}
 	.notice.bad {
 		background: var(--coral);
+	}
+	.notice.quick {
+		background: var(--lime);
 	}
 	@keyframes announce {
 		0% {

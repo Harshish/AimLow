@@ -1,4 +1,4 @@
-export const RULES_VERSION = 'arcade-7';
+export const RULES_VERSION = 'arcade-8';
 export const STEP = 1 / 60;
 export const FLOW_RATE = 150;
 export const PARTICLE_LIFE = 3;
@@ -7,18 +7,22 @@ export const PRESSURE_DRAIN = 1.25;
 export const WAVE_PRESSURE_DRAIN = 0.25;
 export const KILL_PRESSURE_GAIN = 8;
 export const DRINK_PRESSURE_GAIN = 15;
-export const BOWL_STREAK_SECONDS = 3;
+export const BOWL_STREAK_SECONDS = 2.5;
 export const BOWL_STREAK_GRACE = 0.15;
 export const POWERUP_DURATION = 8;
-export const MIN_SPAWN_INTERVAL = 1;
+export const MIN_SPAWN_INTERVAL = 0.8;
 export const KEYBOARD_AIM_SPEED = 18;
 export const AIM_LIMIT_X = 10;
-export const WAVE_BREAK = 4;
+export const WAVE_BREAK = 3.5;
 export const MAX_WAVE_SIZE = 10;
 export const MAX_ACTIVE_ENEMIES = 4;
 export const SCORE_PER_FLOW = 100;
 export const SPILL_PENALTY_PER_FLOW = 35;
 export const DAMAGE_PER_FLOW = 45;
+// Kills this soon after a bug appears earn a bonus, up to double at instant reactions.
+export const QUICK_KILL_WINDOW = 2.5;
+// Two readable tiers: most bugs vary a little; fast ones glow, escape sooner, and pay more.
+export const BUG_SPEEDS = { normal: [0.85, 1.15], fast: [1.3, 1.6] } as const;
 export const DRINKS = {
 	beer: {
 		name: 'Foam Party',
@@ -28,8 +32,8 @@ export const DRINKS = {
 		spread: 3,
 		color: 0x38d9ef
 	},
-	cola: {
-		name: 'Cola Laser',
+	coffee: {
+		name: 'Coffee Laser',
 		description: '60% faster. 50% more flow. Laser precision.',
 		speed: 1.6,
 		emission: 1.5,
@@ -74,13 +78,22 @@ export const DEFAULT_SETTINGS: Settings = {
 export function waveProfile(wave: number) {
 	const level = Math.max(0, wave - 1);
 	return {
-		spawnInterval: Math.max(MIN_SPAWN_INTERVAL, 2.4 - level * 0.17),
+		spawnInterval: Math.max(MIN_SPAWN_INTERVAL, 2 - level * 0.15),
 		// Gradual stat pressure plus new movement, without shrinking hitboxes or escape windows.
 		healthMultiplier: 1 + Math.min(0.8, level * 0.06),
 		pressureDrain: PRESSURE_DRAIN + level * WAVE_PRESSURE_DRAIN,
-		waspHover: Math.max(0.7, 1.25 - level * 0.04)
+		waspHover: Math.max(0.7, 1.25 - level * 0.04),
+		fastChance: level ? Math.min(0.45, 0.15 + level * 0.1) : 0
 	};
 }
+
+export function killReward(kind: BugKind, speed = 1, reaction = QUICK_KILL_WINDOW) {
+	const quick = Math.max(0, 1 - reaction / QUICK_KILL_WINDOW);
+	return Math.round(BUGS[kind].reward * speed * (1 + quick));
+}
+export const MAX_KILL_REWARD = Math.max(
+	...Object.keys(BUGS).map((kind) => killReward(kind as BugKind, BUG_SPEEDS.fast[1], 0))
+);
 
 export function jetProfile(pressure: number, drink: DrinkKind | null) {
 	const p = Math.max(0, Math.min(1, pressure / 20));

@@ -3,8 +3,13 @@
 	import { resolve } from '$app/paths';
 	import App from '$lib/App';
 	import { gameStateStore } from '$lib/Utils/Store';
-	import { DEFAULT_SETTINGS } from '$lib/Game/config';
-	import { RULES_VERSION } from '$lib/Game/config';
+	import {
+		DEFAULT_SETTINGS,
+		RULES_VERSION,
+		BOWL_STREAK_SECONDS,
+		WAVE_BREAK,
+		QUICK_KILL_WINDOW
+	} from '$lib/Game/config';
 	import { loadSettings, saveSettings } from '$lib/Game/settings';
 	import {
 		loadScores,
@@ -369,8 +374,8 @@
 								<div>
 									<b>Build a clean streak.</b>
 									<p>
-										Keep the stream inside the bowl for 3 seconds to earn a power-up. Watch the
-										streak meter: spills, shooting bugs, or leaving the bowl reset it.
+										Keep the stream inside the bowl for {BOWL_STREAK_SECONDS} seconds to earn a power-up.
+										Watch the streak meter: spills, shooting bugs, or leaving the bowl reset it.
 									</p>
 								</div>
 							</li>
@@ -379,10 +384,11 @@
 								<div>
 									<b>React fast.</b>
 									<p>
-										Waves get faster, tougher, and drain more pressure. From wave 3, wasps pause
-										then dart. Wave 4 adds depth-crawling spiders; wave 7 adds ceiling drops. Aim at
-										the bug—the stream follows its depth. Kills restore 8% pressure. Use the
-										4-second breaks to charge a bowl reward.
+										Kill a bug within {QUICK_KILL_WINDOW} seconds of it appearing for bonus points, up
+										to double. Every bug moves at its own pace; from wave 2, glowing red bugs are fast:
+										they escape sooner but pay more. From wave 3, wasps pause then dart. Wave 4 adds depth-crawling
+										spiders; wave 7 adds ceiling drops. Aim at the bug—the stream follows its depth. Kills
+										restore 8% pressure. Use the {WAVE_BREAK}-second breaks to charge a bowl reward.
 									</p>
 								</div>
 							</li>
@@ -391,8 +397,8 @@
 								<div>
 									<b>Use your reward.</b>
 									<p>
-										Foam Party brings 25% more flow. Cola Laser fires 60% faster with 50% more flow
-										and pinpoint aim: more damage and bowl points. Rewards alternate, last 8
+										Foam Party brings 25% more flow. Coffee Laser fires 60% faster with 50% more
+										flow and pinpoint aim: more damage and bowl points. Rewards alternate, last 8
 										seconds, and restore 15% pressure. Build another streak after expiry. Empty
 										tank, game over.
 									</p>
@@ -490,6 +496,13 @@
 						>
 					</div>
 					<div><b>{entry.kills}</b><span>BUGS BLASTED</span></div>
+					<div>
+						<b
+							>{$gameStateStore.fastestKill === null
+								? '—'
+								: `${$gameStateStore.fastestKill.toFixed(2)}s`}</b
+						><span>FASTEST KILL</span>
+					</div>
 					<div><b>{entry.duration.toFixed(1)}s</b><span>LASTED</span></div>
 				</div>
 				{#if party.length}<div class="party-standings">
@@ -959,7 +972,7 @@
 	}
 	.result-stats {
 		display: grid;
-		grid-template-columns: repeat(3, 1fr);
+		grid-template-columns: repeat(4, 1fr);
 		gap: 0.5rem;
 		padding: 1rem 0 1.5rem;
 		border-bottom: 1px solid var(--line);

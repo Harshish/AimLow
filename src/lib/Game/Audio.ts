@@ -36,14 +36,16 @@ export default class Audio {
 			gain.disconnect();
 		};
 	}
-	cue(kind: 'good' | 'bad' | 'drink' | 'start' | 'end') {
+	cue(kind: 'good' | 'bad' | 'drink' | 'quick' | 'start' | 'end') {
 		if (!this.settings.sound) return;
 		const notes =
 			kind === 'bad' || kind === 'end'
 				? [220, 110]
 				: kind === 'drink'
 					? [440, 660, 880]
-					: [523, 784];
+					: kind === 'quick'
+						? [784, 1175, 1568]
+						: [523, 784];
 		notes.forEach((note, i) => this.tone(note, 0.12, 0.06, i * 0.085));
 	}
 	update(phase: Phase) {

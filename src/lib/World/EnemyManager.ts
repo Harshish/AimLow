@@ -10,7 +10,8 @@ import {
 	WAVE_BREAK,
 	MAX_WAVE_SIZE,
 	MAX_ACTIVE_ENEMIES,
-	ENEMY_LANES
+	ENEMY_LANES,
+	BUG_SPEEDS
 } from '../Game/config';
 import Enemy from './Elements/Enemy';
 
@@ -59,6 +60,9 @@ export default class EnemyManager {
 			if (lanes.length) {
 				const lane = lanes[Math.floor(Math.random() * lanes.length)];
 				const id = ++this.sequence;
+				const wave = this.session.state.wave;
+				const tier =
+					Math.random() < waveProfile(wave).fastChance ? BUG_SPEEDS.fast : BUG_SPEEDS.normal;
 				this.enemies.set(
 					id,
 					new Enemy(
@@ -68,7 +72,8 @@ export default class EnemyManager {
 						this.scene,
 						this.physics,
 						lane,
-						this.session.state.wave
+						wave,
+						THREE.MathUtils.randFloat(tier[0], tier[1])
 					)
 				);
 				this.pending--;
@@ -111,7 +116,7 @@ export default class EnemyManager {
 	hit(id: number) {
 		const enemy = this.enemies.get(id);
 		if (!enemy || !enemy.damage(DAMAGE_PER_FLOW / FLOW_RATE)) return false;
-		if (enemy.status === 'dead') this.session.kill(enemy.kind);
+		if (enemy.status === 'dead') this.session.kill(enemy.kind, enemy.speed, enemy.age);
 		return true;
 	}
 	resolveDeadlines() {

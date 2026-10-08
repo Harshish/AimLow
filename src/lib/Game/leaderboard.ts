@@ -3,7 +3,8 @@ import {
 	RULES_VERSION,
 	MAX_FLOW_RATE,
 	FLOW_RATE,
-	SCORE_PER_FLOW
+	SCORE_PER_FLOW,
+	MAX_KILL_REWARD
 } from './config';
 import type { RoundResult } from './Session';
 
@@ -41,7 +42,9 @@ export function validResult(value: unknown): value is RoundResult {
 		s.missed >= 0 &&
 		s.kills + s.missed <= Math.ceil(s.duration / MIN_SPAWN_INTERVAL) &&
 		s.score <=
-			Math.ceil(s.duration * (MAX_FLOW_RATE / FLOW_RATE) * SCORE_PER_FLOW + s.kills * 200) &&
+			Math.ceil(
+				s.duration * (MAX_FLOW_RATE / FLOW_RATE) * SCORE_PER_FLOW + s.kills * MAX_KILL_REWARD
+			) &&
 		(s.accuracy === null || (Number.isFinite(s.accuracy) && s.accuracy >= 0 && s.accuracy <= 1))
 	);
 }

@@ -3,7 +3,7 @@ import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import type Physics from '../Physics';
-import { BUGS, ENEMY_LANES, waveProfile, type BugKind } from '../../Game/config';
+import { BUGS, BUG_SPEEDS, ENEMY_LANES, waveProfile, type BugKind } from '../../Game/config';
 
 /** One data-driven actor, not a subclass hierarchy for two nearly identical bugs. */
 export default class Enemy {
@@ -12,6 +12,7 @@ export default class Enemy {
 	readonly body: RAPIER.RigidBody;
 	readonly maxHealth: number;
 	readonly pattern: 'crawl' | 'depth' | 'drop' | 'hover' | 'dart';
+	readonly fast: boolean;
 	private readonly hoverDuration: number;
 	health: number;
 	age = 0;
@@ -45,12 +46,14 @@ export default class Enemy {
 		private readonly scene: THREE.Scene,
 		private readonly physics: Physics,
 		readonly lane: number,
-		wave = 1
+		wave = 1,
+		readonly speed = 1
 	) {
 		const difficulty = waveProfile(wave);
 		this.maxHealth = BUGS[kind].health * difficulty.healthMultiplier;
 		this.health = this.maxHealth;
 		this.hoverDuration = difficulty.waspHover;
+		this.fast = speed >= BUG_SPEEDS.fast[0];
 		this.pattern =
 			kind === 'wasp'
 				? wave >= 3
@@ -73,7 +76,7 @@ export default class Enemy {
 						: Math.PI
 					: (-side * (this.inward ? 1 : -1) * Math.PI) / 2;
 		this.mixer = new THREE.AnimationMixer(this.model);
-		this.mixer.timeScale = 1.8;
+		this.mixer.timeScale = 1.8 * speed;
 		this.play(kind === 'spider' ? 'walk cycle' : 'Wasp_Flying');
 		// Measure the walking pose, not the rig's bind pose, so the feet meet the floor.
 		this.mixer.update(0);
@@ -121,13 +124,20 @@ export default class Enemy {
 	get active() {
 		return this.status === 'active';
 	}
+	/** Movement time since the spawn pop, scaled by this bug's pace. */
+	private get clock() {
+		return Math.max(0, this.age - 0.3) * this.speed;
+	}
 	get dropping() {
-		return this.pattern === 'drop' && this.age < 1.55;
+		return this.pattern === 'drop' && this.clock < 1.25;
+	}
+	get deadline() {
+		return BUGS[this.kind].deadline / this.speed;
 	}
 	get remaining() {
 		// Falling spiders can be shot in the air, but get a full escape window on the floor.
-		const delay = this.pattern === 'drop' ? 1.55 : 0.3;
-		return Math.max(0, BUGS[this.kind].deadline - Math.max(0, this.age - delay));
+		const landed = Math.max(0, this.clock - (this.pattern === 'drop' ? 1.25 : 0));
+		return Math.max(0, BUGS[this.kind].deadline - landed) / this.speed;
 	}
 	private play(suffix: string, once = false) {
 		const clip = this.asset.animations.find((clip) => clip.name.endsWith(suffix));
@@ -142,7 +152,7 @@ export default class Enemy {
 	private move() {
 		const lane = ENEMY_LANES[this.lane];
 		const side = Math.sign(lane.x);
-		const time = Math.max(0, this.age - 0.3);
+		const time = this.clock;
 		// Stay beside the porcelain: targets must never hide behind its physical shell.
 		if (this.kind === 'spider') {
 			const crawlTime = Math.max(0, time - (this.pattern === 'drop' ? 1.25 : 0));
@@ -169,8 +179,8 @@ export default class Enemy {
 			);
 		} else {
 			this.position.set(
-				lane.x + Math.sin(this.age * 3.6 + this.motionPhase) * 0.7,
-				lane.y + Math.sin(this.age * 4.8 + this.motionPhase) * 0.55,
+				lane.x + Math.sin(this.age * this.speed * 3.6 + this.motionPhase) * 0.7,
+				lane.y + Math.sin(this.age * this.speed * 4.8 + this.motionPhase) * 0.55,
 				5.5
 			);
 		}
@@ -193,14 +203,17 @@ export default class Enemy {
 		this.body.setNextKinematicTranslation(this.position);
 		this.mixer.update(dt);
 		this.healthBar.scale.x = Math.max(0.01, this.health / this.maxHealth);
-		this.timerBar.scale.x = Math.max(0.01, this.remaining / BUGS[this.kind].deadline);
-		this.timerMaterial.color.set(this.remaining < 2 ? 0xff6577 : 0xffb74d);
+		const timeLeft = this.remaining / this.deadline;
+		this.timerBar.scale.x = Math.max(0.01, timeLeft);
+		this.timerMaterial.color.set(timeLeft < 0.5 ? 0xff6577 : 0xffb74d);
 		this.hitFlash = Math.max(0, this.hitFlash - dt);
+		const hit = this.hitFlash > 0;
 		for (const material of this.materials) {
 			const lit = material as THREE.MeshStandardMaterial;
 			if (lit.emissive) {
-				lit.emissive.set(0x8adfff);
-				lit.emissiveIntensity = this.hitFlash > 0 ? 0.6 : this.kind === 'spider' ? 0.2 : 0.05;
+				// Fast bugs glow hot so their shorter escape window is readable at a glance.
+				lit.emissive.set(this.fast && !hit ? 0xff5a36 : 0x8adfff);
+				lit.emissiveIntensity = hit ? 0.6 : this.fast ? 0.5 : this.kind === 'spider' ? 0.2 : 0.05;
 			}
 		}
 	}

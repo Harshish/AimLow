@@ -37,6 +37,10 @@ import {
 	FLOW_RATE,
 	MAX_FLOW_RATE,
 	PARTICLE_LIFE,
+	BUG_SPEEDS,
+	QUICK_KILL_WINDOW,
+	MAX_KILL_REWARD,
+	killReward,
 	type DrinkKind
 } from '../src/lib/Game/config';
 import {
@@ -191,24 +195,24 @@ test('elevated camera frames ground and flying targets with reachable pointer an
 });
 
 test('all stream profiles use blue or cyan rather than yellow', () => {
-	for (const drink of [null, 'beer', 'cola'] as const) {
+	for (const drink of [null, 'beer', 'coffee'] as const) {
 		const color = new THREE.Color(jetProfile(100, drink).color);
 		assert.ok(color.b > color.r && color.g > color.r);
 	}
 });
 
-test('Cola is faster, denser, and more precise than normal flow even at low pressure', () => {
+test('Coffee is faster, denser, and more precise than normal flow even at low pressure', () => {
 	for (const pressure of [1, 5, 20, 100]) {
 		const normal = jetProfile(pressure, null);
-		const cola = jetProfile(pressure, 'cola');
+		const coffee = jetProfile(pressure, 'coffee');
 		const beer = jetProfile(pressure, 'beer');
-		assert.equal(cola.speed, normal.speed * 1.6);
-		assert.equal(cola.emission, normal.emission * 1.5);
-		assert.ok(cola.spread < normal.spread);
+		assert.equal(coffee.speed, normal.speed * 1.6);
+		assert.equal(coffee.emission, normal.emission * 1.5);
+		assert.ok(coffee.spread < normal.spread);
 		assert.equal(beer.emission, normal.emission * 1.25);
-		assert.ok(cola.emission <= MAX_FLOW_RATE);
+		assert.ok(coffee.emission <= MAX_FLOW_RATE);
 	}
-	for (const drink of [null, 'beer', 'cola'] as const) {
+	for (const drink of [null, 'beer', 'coffee'] as const) {
 		assert.equal(jetProfile(0, drink).emission, 0);
 		assert.equal(jetProfile(0, drink).speed, 0);
 	}
@@ -363,7 +367,7 @@ test('clean bowl streaks award alternating power-ups once, respect pause, and re
 		session.tick(POWERUP_DURATION);
 		assert.equal(session.state.drink, null);
 		feed(BOWL_STREAK_SECONDS * fps);
-		assert.equal(session.snapshot().drink?.kind, 'cola');
+		assert.equal(session.snapshot().drink?.kind, 'coffee');
 		session.tick(200);
 		const result = session.state.result;
 		feed(BOWL_STREAK_SECONDS * fps);
@@ -652,7 +656,7 @@ test('droplets resolve once, ignore shell contacts, and release all physics iden
 		}
 		jet.reset();
 		for (let i = 0; i < 210; i++) {
-			jet.update(STEP, new THREE.Vector3(0, 6, 5.5), jetProfile(100, 'cola'));
+			jet.update(STEP, new THREE.Vector3(0, 6, 5.5), jetProfile(100, 'coffee'));
 			jet.resolve([], () => false);
 		}
 		jet.syncInstances();
@@ -745,23 +749,25 @@ test('jet captures the inner bowl at varied angles and rescues low pressure in e
 	);
 	const assets = { urinal, spider, wasp, floor: new THREE.Texture(), wall: new THREE.Texture() };
 	try {
-		const cases: [number, number, DrinkKind | null, number, number?][] = ENEMY_LANES.map(
+		const cases: [number, number, DrinkKind | null, number, number?, number?][] = ENEMY_LANES.map(
 			(_, lane) => [lane, 5, null, 1]
 		);
-		for (const drink of [null, 'beer', 'cola'] as const) cases.push([5, 100, drink, 1]);
+		for (const drink of [null, 'beer', 'coffee'] as const) cases.push([5, 100, drink, 1]);
 		for (let lane = 0; lane < ENEMY_LANES.length; lane++) {
-			cases.push([lane, 5, null, 13], [lane, 5, 'cola', 13]);
+			cases.push([lane, 5, null, 13], [lane, 5, 'coffee', 13]);
+			// The fastest late-wave bug still leaves a low-pressure rescue window.
+			cases.push([lane, 5, null, 13, 1, BUG_SPEEDS.fast[1]]);
 		}
 		cases.push([0, 20, null, 13, 3], [1, 20, null, 13, 3]);
 		const killTimes = new Map<DrinkKind | null, number>();
-		for (const [lane, pressure, drink, wave, id = 1] of cases) {
+		for (const [lane, pressure, drink, wave, id = 1, speed = 1] of cases) {
 			seed = 42;
 			const scene = new THREE.Scene();
 			const physics = await Physics.create();
 			new Environment(scene, physics, assets);
 			const session = new Session();
 			const kind = ENEMY_LANES[lane].kind;
-			const enemy = new Enemy(id, kind, assets[kind], scene, physics, lane, wave);
+			const enemy = new Enemy(id, kind, assets[kind], scene, physics, lane, wave, speed);
 			const jet = new WaterJet(scene, physics);
 			try {
 				session.start();
@@ -782,7 +788,7 @@ test('jet captures the inner bowl at varied angles and rescues low pressure in e
 				assert.equal(
 					enemy.status,
 					'dead',
-					`lane ${lane}, pressure ${pressure}, drink ${drink}, wave ${wave} stays hittable`
+					`lane ${lane}, pressure ${pressure}, drink ${drink}, wave ${wave}, speed ${speed} stays hittable`
 				);
 				assert.equal(session.state.kills, 1);
 				assert.ok(enemy.remaining > 0, 'kill beats the escape timer, including drop landing time');
@@ -799,10 +805,10 @@ test('jet captures the inner bowl at varied angles and rescues low pressure in e
 			}
 		}
 		assert.ok(
-			killTimes.get('cola')! < killTimes.get(null)! * 0.85,
-			'Cola kills moving targets noticeably faster'
+			killTimes.get('coffee')! < killTimes.get(null)! * 0.85,
+			'Coffee kills moving targets noticeably faster'
 		);
-		for (const drink of [null, 'beer', 'cola'] as const) {
+		for (const drink of [null, 'beer', 'coffee'] as const) {
 			seed = 42;
 			const scene = new THREE.Scene();
 			const physics = await Physics.create();
@@ -819,7 +825,7 @@ test('jet captures the inner bowl at varied angles and rescues low pressure in e
 					captured += jet.resolve(physics.loop(STEP), () => false).captured;
 				}
 				assert.ok(
-					captured > (drink === 'beer' ? 2.4 : drink === 'cola' ? 4.2 : 2.7),
+					captured > (drink === 'beer' ? 2.4 : drink === 'coffee' ? 4.2 : 2.7),
 					`${drink}: faster stream still lands in the basin (${captured}/3)`
 				);
 			} finally {
@@ -897,6 +903,68 @@ test('bugs move quickly, have short reaction windows, and need only a brief burs
 		assert.ok(BUGS.wasp.health / DAMAGE_PER_FLOW <= 0.15);
 	} finally {
 		wasp.dispose();
+		physics.dispose();
+		disposeResources([bug.scene]);
+	}
+});
+
+test('bug pace varies: fast bugs move sooner, escape sooner, glow, and quick kills pay more', async (t) => {
+	t.mock.method(Math, 'random', () => 0);
+	const scene = new THREE.Scene();
+	const physics = await Physics.create();
+	const bug = model();
+	bug.scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial()));
+	const fast = BUG_SPEEDS.fast[1];
+	const normal = new Enemy(1, 'spider', bug, scene, physics, 0, 1);
+	const quick = new Enemy(2, 'spider', bug, scene, physics, 1, 1, fast);
+	const drop = new Enemy(3, 'spider', bug, scene, physics, 0, 7, fast);
+	const session = new Session();
+	const advance = (dt: number, ...enemies: Enemy[]) => {
+		for (const enemy of enemies) enemy.update(dt, true);
+		physics.loop(STEP);
+	};
+	try {
+		assert.equal(normal.fast, false);
+		assert.equal(quick.fast, true);
+		assert.equal(quick.mixer.timeScale, 1.8 * fast, 'legs animate at the bug pace');
+		advance(0.3, normal, quick, drop);
+		assert.equal(quick.remaining, BUGS.spider.deadline / fast, 'fast bugs escape sooner');
+		const start = [normal.root.position.clone(), quick.root.position.clone()];
+		advance(0.5, normal, quick);
+		assert.ok(
+			quick.root.position.distanceTo(start[1]) > normal.root.position.distanceTo(start[0]) * 1.5,
+			'fast bugs cover more ground'
+		);
+		advance(quick.remaining - 1e-3, quick);
+		assert.ok(quick.remaining > 0 && Math.abs(quick.root.position.x) >= 4, 'crawl ends at escape');
+		advance(1.25 / fast - 1e-3, drop);
+		assert.equal(drop.dropping, true);
+		advance(2e-3, drop);
+		assert.equal(drop.dropping, false, 'fast drops land sooner');
+		assert.ok(Math.abs(drop.remaining - drop.deadline) < 1e-2, 'landing still gets a full window');
+
+		assert.equal(killReward('wasp'), BUGS.wasp.reward, 'slow kills pay the base reward');
+		assert.equal(killReward('wasp', 1, 0), BUGS.wasp.reward * 2, 'instant kills pay double');
+		assert.ok(killReward('wasp', fast, 1) > killReward('wasp', 1, 1), 'fast bugs pay more');
+		assert.equal(MAX_KILL_REWARD, Math.round(BUGS.wasp.reward * fast * 2));
+		assert.equal(waveProfile(1).fastChance, 0, 'wave 1 teaches the base pace');
+		for (let wave = 2; wave <= 30; wave++) {
+			assert.ok(waveProfile(wave).fastChance >= waveProfile(wave - 1).fastChance);
+			assert.ok(waveProfile(wave).fastChance <= 0.45, 'most bugs stay on the normal pace');
+		}
+		session.start();
+		session.tick(3);
+		session.kill('spider', fast, 0.9);
+		assert.equal(session.state.score, killReward('spider', fast, 0.9));
+		assert.equal(session.state.notice!.tone, 'quick');
+		assert.match(session.state.notice!.text, /0\.90s QUICK KILL/);
+		session.kill('wasp', 1, QUICK_KILL_WINDOW + 1);
+		assert.equal(session.state.notice!.tone, 'good');
+		assert.equal(session.state.fastestKill, 0.9, 'results show the best reaction');
+		session.start();
+		assert.equal(session.state.fastestKill, null);
+	} finally {
+		for (const enemy of [normal, quick, drop]) enemy.dispose();
 		physics.dispose();
 		disposeResources([bug.scene]);
 	}

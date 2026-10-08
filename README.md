@@ -2,7 +2,7 @@
 
 **Low aim. High scores.** A local browser arcade party game built with SvelteKit, Three.js, Rapier, and SQLite.
 
-Test your reactions: snap to animated spiders and wasps for quick burst kills, then return to the bowl. A clean 3-second bowl streak earns a stream power-up. When the tank empties, compare scores and pass the device.
+Test your reactions: snap to animated spiders and wasps for quick burst kills, then return to the bowl. Faster reactions and faster bugs pay more. A clean 2.5-second bowl streak earns a stream power-up. When the tank empties, compare scores and pass the device.
 
 ## Run locally
 
@@ -25,17 +25,19 @@ The game includes solo play, 2–8-player same-device party play, leaderboards, 
 - Keyboard: WASD/arrow keys aim; Escape pauses/resumes.
 - Switching tabs or losing focus pauses the round. Resume explicitly.
 - **Foam Party:** 40% faster, 25% more flow, wide cyan stream.
-- **Cola Laser:** 60% faster, 50% more flow, precise blue stream. Extra flow increases both damage and bowl score.
-- Spiders start with 9 health and wasps 6: about 0.2s / 0.13s of direct hits at full pressure. Health rises 6% of base per wave, capped at +80%. Active escape windows stay at 3s / 2.75s. Bug kills restore 8% pressure.
-- A 3-second clean bowl streak awards an 8-second power-up plus 15% pressure (capped at 100%). Rewards alternate Foam Party / Cola Laser. Spills, bug hits, or a sustained gap reset progress; tiny gaps between droplets are tolerated but add no progress. Streaks cannot charge during an active power-up. There are no collectible cans.
-- Waves grow from 3 to 10 bugs, with a 4-second breather to recharge bowl streaks and at most 4 bugs on screen. Spawn intervals drop by 0.17s per wave, from 2.4s to a 1s minimum. Pressure drain starts at 1.25 per second and rises by 0.25 each wave from wave 2 onward.
-- Wave 3 introduces wasps that hold a perch, then dart smoothly to another. Hover windows shorten from 1.17s to a 0.7s minimum as waves advance.
+- **Coffee Laser:** 60% faster, 50% more flow, precise blue stream. Extra flow increases both damage and bowl score.
+- Spiders start with 9 health and wasps 6: about 0.2s / 0.13s of direct hits at full pressure. Health rises 6% of base per wave, capped at +80%. Base escape windows are 3s / 2.75s. Bug kills restore 8% pressure.
+- Each bug rolls its own pace. Normal bugs run at 0.85–1.15×. From wave 2, fast bugs (1.3–1.6×) glow red: 25% of spawns, rising 10% per wave to a 45% cap. Pace scales movement, animation, and the escape window (a 1.6× spider escapes in ~1.9s), and multiplies the kill reward.
+- Quick kills: a kill within 2.5s of a bug appearing earns a bonus of up to +100%, shrinking linearly to zero. Kills within 1.25s show a QUICK KILL banner with its own sound. Every kill notice shows the reaction time; results show your fastest kill.
+- A 2.5-second clean bowl streak awards an 8-second power-up plus 15% pressure (capped at 100%). Rewards alternate Foam Party / Coffee Laser. Spills, bug hits, or a sustained gap reset progress; tiny gaps between droplets are tolerated but add no progress. Streaks cannot charge during an active power-up. There are no collectible cans.
+- Waves grow from 3 to 10 bugs, with a 3.5-second breather to recharge bowl streaks and at most 4 bugs on screen. Spawn intervals drop by 0.15s per wave, from 2s to a 0.8s minimum. Pressure drain starts at 1.25 per second and rises by 0.25 each wave from wave 2 onward.
+- Wave 3 introduces wasps that hold a perch, then dart smoothly to another. Hover windows shorten from 1.17s to a 0.7s minimum as waves advance, divided by the wasp's pace.
 - Wave 4 mixes in spiders crawling along Z; wave 7 adds ceiling-drop spiders. Drops take 1.25s after the spawn cue and get a full 3s ground escape window on landing. Their side is reserved while falling so they do not overlap wasps.
 - Spiders face their travel direction, including depth crawls. Aim at the visible bug with mouse, touch, or keyboard; the stream adjusts to its depth without snapping sideways.
 - Bugs use six randomized ground/air lanes set farther from the urinal. Wider camera framing and aim bounds keep them reachable. Reduced motion disables cosmetic pop/spin, not gameplay movement; the HUD shows streak progress and the active reward.
 - Faster shots and keyboard aiming reduce target-switching delay. Low pressure retains enough jet speed and damage for a recovery kill.
-- Normal bowl flow earns 100 points per second; Foam Party earns up to 125 and Cola Laser up to 150. Spills cost 35 per full-flow second. Accuracy includes successful bowl and bug hits.
-- Rebalanced waves and power-ups use the `arcade-7` leaderboard. Older scores remain stored separately.
+- Normal bowl flow earns 100 points per second; Foam Party earns up to 125 and Coffee Laser up to 150. Spills cost 35 per full-flow second. Accuracy includes successful bowl and bug hits.
+- Rebalanced waves, bug pace, and kill rewards use the `arcade-8` leaderboard. Older scores remain stored separately.
 
 ## Local score storage
 
@@ -88,7 +90,7 @@ See [the gameplay plan](docs/AIMLOW_GAME_PLAN.md) for current rules and mileston
 
 ## Checks
 
-`pnpm test` runs 28 focused Node tests using the existing esbuild dependency. This includes real Rapier simulation, animated spider grounding, wave growth/reset/pause, varied non-overlapping spawn lanes, outer-lane framing, quick-kill health and reaction windows, timed streak rewards at 30/60/120 Hz, streak interruption and cooldown, actual World-to-bowl reward integration, low-pressure shots, and temporary SQLite files for persistence, migration, ranking, duplicate protection, and result validation. No new testing framework or runtime database dependency.
+`pnpm test` runs 31 focused Node tests using the existing esbuild dependency. This includes real Rapier simulation, animated spider grounding, wave growth/reset/pause, varied non-overlapping spawn lanes, outer-lane framing, quick-kill health and reaction windows, per-bug pace and quick-kill rewards, timed streak rewards at 30/60/120 Hz, streak interruption and cooldown, actual World-to-bowl reward integration, low-pressure shots, and temporary SQLite files for persistence, migration, ranking, duplicate protection, and result validation. No new testing framework or runtime database dependency.
 
 Earlier headless Chrome checks covered desktop/mobile layouts and the round lifecycle. Reaction/streak changes are covered by Node and physics tests; browser visual checks, actual phone/touch-device testing, and gameplay tuning remain separate.
 
