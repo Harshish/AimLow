@@ -3,7 +3,14 @@ import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import type Physics from '../Physics';
-import { BUGS, BUG_SPEEDS, ENEMY_LANES, waveProfile, type BugKind } from '../../Game/config';
+import {
+	BUGS,
+	BUG_SPEEDS,
+	ENEMY_LANES,
+	UNLOCK_WAVE,
+	waveProfile,
+	type BugKind
+} from '../../Game/config';
 
 /** One data-driven actor, not a subclass hierarchy for two nearly identical bugs. */
 export default class Enemy {
@@ -57,12 +64,12 @@ export default class Enemy {
 		this.fast = speed >= BUG_SPEEDS.fast[0];
 		this.pattern =
 			kind === 'wasp'
-				? wave >= 3
+				? wave >= UNLOCK_WAVE.dart
 					? 'dart'
 					: 'hover'
-				: wave >= 7 && id % 3 === 0
+				: wave >= UNLOCK_WAVE.drop && id % 3 === 0
 					? 'drop'
-					: wave >= 4 && id % 3 === 1
+					: wave >= UNLOCK_WAVE.depth && id % 3 === 1
 						? 'depth'
 						: 'crawl';
 		this.model = clone(asset.scene);
@@ -155,34 +162,44 @@ export default class Enemy {
 		const lane = ENEMY_LANES[this.lane];
 		const side = Math.sign(lane.x);
 		const time = this.clock;
+		const reach = this.fast ? BUGS[this.kind].fastReach : 1;
 		// Stay beside the porcelain: targets must never hide behind its physical shell.
 		if (this.kind === 'spider') {
 			const crawlTime = Math.max(0, time - (this.pattern === 'drop' ? 1.25 : 0));
 			const progress = Math.min(1, crawlTime / BUGS.spider.deadline);
 			const falling = this.pattern === 'drop' ? 14 * (1 - Math.min(1, time / 1.25) ** 2) : 0;
+			// Fast floor crawls span more ground. Drops fall at the path's end, near the top screen
+			// corner, and depth runs are boxed in by the wall and aim plane, so they only get pace.
+			const span = this.pattern === 'crawl' ? reach : 1;
 			this.position.set(
 				this.pattern === 'depth'
 					? lane.x
-					: lane.x + side * (this.inward ? 1 - progress * 2 : progress * 2 - 1),
+					: lane.x + side * span * (this.inward ? 1 - progress * 2 : progress * 2 - 1),
 				this.groundHeight * this.root.scale.y + falling,
 				this.pattern === 'depth' ? 3.25 + 2.25 * (this.inward ? progress : 1 - progress) : 5.5
 			);
-		} else if (this.pattern === 'dart') {
+			return;
+		}
+		// Wider flight grows away from the other wasp lane on this side (lanes sit at y 7.5 and 11.5).
+		const lift = lane.y + Math.sign(lane.y - 9.5) * 0.8 * (reach - 1);
+		if (this.pattern === 'dart') {
 			// Hold a readable target, then smoothly move to the next perch; never teleport.
-			const cycle = this.hoverDuration + 0.45;
+			// Wider jumps hold longer so the stream, which lags the aim, can still land.
+			const hover = this.hoverDuration * reach;
+			const cycle = hover + 0.45;
 			const perch = Math.floor(time / cycle);
-			const travel = THREE.MathUtils.smoothstep(time % cycle, this.hoverDuration, cycle);
+			const travel = THREE.MathUtils.smoothstep(time % cycle, hover, cycle);
 			const from = this.motionPhase + perch * 2.4;
 			const to = from + 2.4;
 			this.position.set(
-				lane.x + THREE.MathUtils.lerp(Math.sin(from), Math.sin(to), travel) * 1.1,
-				lane.y + THREE.MathUtils.lerp(Math.cos(from), Math.cos(to), travel) * 0.8,
+				lane.x + THREE.MathUtils.lerp(Math.sin(from), Math.sin(to), travel) * 1.1 * reach,
+				lift + THREE.MathUtils.lerp(Math.cos(from), Math.cos(to), travel) * 0.8 * reach,
 				5.5
 			);
 		} else {
 			this.position.set(
-				lane.x + Math.sin(this.age * this.speed * 3.6 + this.motionPhase) * 0.7,
-				lane.y + Math.sin(this.age * this.speed * 4.8 + this.motionPhase) * 0.55,
+				lane.x + Math.sin(this.age * this.speed * 3.6 + this.motionPhase) * 0.7 * reach,
+				lift + Math.sin(this.age * this.speed * 4.8 + this.motionPhase) * 0.55 * reach,
 				5.5
 			);
 		}

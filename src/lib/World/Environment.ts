@@ -102,6 +102,7 @@ export default class Environment {
 		physics.add(wall, 'fixed', 'cuboid', { kind: 'spill' });
 
 		// The title as a lime floor tag in front of the bowl: on brand, never behind a bug lane.
+		// Half-opaque paint lets the wet tiles read through; the text stays in front of spider lanes.
 		const tag = new THREE.MeshStandardNodeMaterial({
 			transparent: true,
 			depthWrite: false,
@@ -110,10 +111,10 @@ export default class Environment {
 			roughness: 0.6
 		});
 		tag.colorNode = color(0xc8f25a);
-		tag.opacityNode = texture(assets.graffiti).a.mul(0.85);
-		const decal = new THREE.Mesh(new THREE.PlaneGeometry(7, 7), tag);
+		tag.opacityNode = texture(assets.graffiti).a.mul(0.5);
+		const decal = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), tag);
 		decal.rotation.x = -Math.PI / 2;
-		decal.position.set(0.2, 0.01, 11.5);
+		decal.position.set(0.2, 0.01, 11);
 		decal.receiveShadow = true;
 		scene.add(decal);
 	}

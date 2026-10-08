@@ -12,7 +12,8 @@ import {
 	MAX_ACTIVE_ENEMIES,
 	ENEMY_LANES,
 	BUG_SPEEDS,
-	QUICK_KILL_WINDOW
+	QUICK_KILL_WINDOW,
+	UNLOCK_WAVE
 } from '../Game/config';
 import Enemy from './Elements/Enemy';
 import type Effects from './Effects';
@@ -52,7 +53,9 @@ export default class EnemyManager {
 			const kind = (this.sequence + this.session.state.wave) % 2 ? 'spider' : 'wasp';
 			const occupied = new Set([...this.enemies.values()].map((enemy) => enemy.lane));
 			const dropping =
-				kind === 'spider' && this.session.state.wave >= 7 && (this.sequence + 1) % 3 === 0;
+				kind === 'spider' &&
+				this.session.state.wave >= UNLOCK_WAVE.drop &&
+				(this.sequence + 1) % 3 === 0;
 			const lanes = ENEMY_LANES.map((_, i) => i).filter(
 				(i) =>
 					ENEMY_LANES[i].kind === kind &&

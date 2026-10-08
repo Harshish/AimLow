@@ -1441,12 +1441,17 @@ test('all movement patterns stay framed, face correctly, and remain reachable by
 		() => {}
 	);
 	try {
-		for (const [random, wave, id] of [0, 0.75].flatMap((random) => [
+		const fast = BUG_SPEEDS.fast[1];
+		for (const [random, wave, id, speed = 1] of [0, 0.75].flatMap((random) => [
 			[random, 1, 2],
 			[random, 4, 1],
 			[random, 7, 3],
 			[random, 13, 1],
-			[random, 13, 3]
+			[random, 13, 3],
+			// Fast bugs crawl and fly wider, but still stay framed and clear of the urinal.
+			[random, 2, 2, fast],
+			[random, 13, 1, fast],
+			[random, 13, 3, fast]
 		])) {
 			t.mock.method(Math, 'random', () => random);
 			for (let lane = 0; lane < ENEMY_LANES.length; lane++) {
@@ -1458,7 +1463,8 @@ test('all movement patterns stay framed, face correctly, and remain reachable by
 					scene,
 					physics,
 					lane,
-					wave
+					wave,
+					speed
 				);
 				manager.enemies.set(id, enemy);
 				try {

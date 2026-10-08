@@ -12,6 +12,7 @@ import {
 	SPILL_PENALTY_PER_FLOW,
 	QUICK_KILL_WINDOW,
 	killReward,
+	UNLOCK_WAVE,
 	type BugKind,
 	type DrinkKind
 } from './config';
@@ -158,11 +159,11 @@ export default class Session {
 		const warning =
 			this.state.wave === 2
 				? 'GLOWING BUGS ARE FAST'
-				: this.state.wave === 3
+				: this.state.wave === UNLOCK_WAVE.dart
 					? 'WASPS NOW DART'
-					: this.state.wave === 4
+					: this.state.wave === UNLOCK_WAVE.depth
 						? 'WATCH THE BACK ROW'
-						: this.state.wave === 7
+						: this.state.wave === UNLOCK_WAVE.drop
 							? 'SPIDERS FROM ABOVE'
 							: this.state.wave > 1
 								? 'PRESSURE RISING'
