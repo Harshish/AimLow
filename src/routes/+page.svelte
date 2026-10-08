@@ -421,6 +421,11 @@
 									bind:checked={settings.music}
 								/></label
 							><label
+								><span>Haptics<small>Buzz on kills and escapes. Phones only.</small></span><input
+									type="checkbox"
+									bind:checked={settings.haptics}
+								/></label
+							><label
 								><span>Reduced motion<small>Less spin and pulsing.</small></span><input
 									type="checkbox"
 									bind:checked={settings.reducedMotion}
@@ -438,8 +443,11 @@
 									bind:value={settings.sensitivity}
 								/></label
 							><label
-								><span>Visual quality<small>Never changes gameplay or score.</small></span><select
-									bind:value={settings.quality}
+								><span
+									>Visual quality<small
+										>High adds god rays and shadows. Never changes gameplay or score.</small
+									></span
+								><select bind:value={settings.quality}
 									><option value="high">High</option><option value="low">Low</option></select
 								></label
 							>

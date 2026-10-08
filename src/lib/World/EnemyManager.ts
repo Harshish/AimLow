@@ -11,9 +11,11 @@ import {
 	MAX_WAVE_SIZE,
 	MAX_ACTIVE_ENEMIES,
 	ENEMY_LANES,
-	BUG_SPEEDS
+	BUG_SPEEDS,
+	QUICK_KILL_WINDOW
 } from '../Game/config';
 import Enemy from './Elements/Enemy';
+import type Effects from './Effects';
 
 export default class EnemyManager {
 	readonly enemies = new Map<number, Enemy>();
@@ -25,11 +27,14 @@ export default class EnemyManager {
 	private readonly aimSphere = new THREE.Sphere();
 	private readonly aimHit = new THREE.Vector3();
 	private readonly shotAim = new THREE.Vector3();
+	/** True while the aim ray passes through a live bug; drives the reticle lock-on. */
+	locked = false;
 	constructor(
 		private readonly scene: THREE.Scene,
 		private readonly physics: Physics,
 		private readonly assets: LoadedAssets,
-		private readonly session: Session
+		private readonly session: Session,
+		private readonly effects?: Effects
 	) {}
 
 	update(dt: number, reducedMotion: boolean) {
@@ -63,19 +68,18 @@ export default class EnemyManager {
 				const wave = this.session.state.wave;
 				const tier =
 					Math.random() < waveProfile(wave).fastChance ? BUG_SPEEDS.fast : BUG_SPEEDS.normal;
-				this.enemies.set(
+				const enemy = new Enemy(
 					id,
-					new Enemy(
-						id,
-						kind,
-						this.assets[kind],
-						this.scene,
-						this.physics,
-						lane,
-						wave,
-						THREE.MathUtils.randFloat(tier[0], tier[1])
-					)
+					kind,
+					this.assets[kind],
+					this.scene,
+					this.physics,
+					lane,
+					wave,
+					THREE.MathUtils.randFloat(tier[0], tier[1])
 				);
+				this.enemies.set(id, enemy);
+				this.effects?.spawn(enemy.root.position, enemy.fast);
 				this.pending--;
 				this.nextSpawn = time + waveProfile(this.session.state.wave).spawnInterval;
 			}
@@ -110,13 +114,18 @@ export default class EnemyManager {
 				depth = enemy.root.position.z;
 			}
 		}
+		this.locked = nearest < Infinity;
 		if (Math.abs(this.aimRay.direction.z) < 1e-6) return this.shotAim.copy(aim);
 		return this.aimRay.at((depth - this.aimRay.origin.z) / this.aimRay.direction.z, this.shotAim);
 	}
 	hit(id: number) {
 		const enemy = this.enemies.get(id);
 		if (!enemy || !enemy.damage(DAMAGE_PER_FLOW / FLOW_RATE)) return false;
-		if (enemy.status === 'dead') this.session.kill(enemy.kind, enemy.speed, enemy.age);
+		if (enemy.status === 'dead') {
+			const points = this.session.kill(enemy.kind, enemy.speed, enemy.age);
+			const quick = enemy.age <= QUICK_KILL_WINDOW / 2;
+			this.effects?.kill(enemy.root.position, enemy.kind, enemy.fast, points, quick);
+		}
 		return true;
 	}
 	resolveDeadlines() {
@@ -125,6 +134,7 @@ export default class EnemyManager {
 			if (enemy.active && enemy.remaining <= 0) {
 				enemy.retire('escaped');
 				this.session.miss(enemy.kind);
+				this.effects?.escape(enemy.root.position);
 			}
 		}
 	}
@@ -135,5 +145,6 @@ export default class EnemyManager {
 		this.nextWaveAt = WAVE_BREAK;
 		this.pending = 0;
 		this.sequence = 0;
+		this.locked = false;
 	}
 }

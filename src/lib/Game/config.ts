@@ -63,6 +63,7 @@ export const ENEMY_LANES = [
 export type Settings = {
 	sound: boolean;
 	music: boolean;
+	haptics: boolean;
 	sensitivity: number;
 	reducedMotion: boolean;
 	quality: 'low' | 'high';
@@ -70,6 +71,7 @@ export type Settings = {
 export const DEFAULT_SETTINGS: Settings = {
 	sound: true,
 	music: false,
+	haptics: true,
 	sensitivity: 1,
 	reducedMotion: false,
 	quality: 'high'

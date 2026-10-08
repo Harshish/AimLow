@@ -178,7 +178,7 @@ export default class Session {
 	}
 	/** `reaction` is seconds since the bug appeared; faster bugs and reactions pay more. */
 	kill(kind: BugKind, speed = 1, reaction = QUICK_KILL_WINDOW) {
-		if (!this.playing) return;
+		if (!this.playing) return 0;
 		const points = killReward(kind, speed, reaction);
 		const quick = reaction <= QUICK_KILL_WINDOW / 2;
 		this.state.kills++;
@@ -190,6 +190,7 @@ export default class Session {
 			`+${points} · ${reaction.toFixed(2)}s ${quick ? 'QUICK KILL!' : kind === 'wasp' ? 'BUZZ OFF!' : 'EIGHT LEGS. ZERO CHANCE.'} · +${KILL_PRESSURE_GAIN}% PRESSURE`,
 			quick ? 'quick' : 'good'
 		);
+		return points;
 	}
 	miss(kind: BugKind) {
 		if (!this.playing) return;

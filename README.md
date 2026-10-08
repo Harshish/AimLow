@@ -67,13 +67,14 @@ The database and its SQLite journal files are ignored by Git. To choose a differ
     Session          Pure rules: phases, pressure, score, bowl streaks, power-ups, results
     InputController  Canvas-relative pointer/touch + keyboard aim; focus loss
     World            Bounded 60 Hz simulation, complete round reset
-      Environment    Static bathroom and inner catch sensor
-      WaterJet       Weighted droplets, one terminal outcome, instanced drawing
+      Environment    Static bathroom, inner catch sensor, hero/lane lights, haze volume
+      WaterJet       Weighted droplets, one terminal outcome, stretched instanced drawing
+      Effects        Cosmetic pooled sparks and score popups; never affects rules
       EnemyManager   Growing waves, free spawn lanes, deadlines, independent enemies
       Physics        Rapier bodies, collider identities, collision outcomes
     AssetLoader      Shared GLTF/texture ownership, cancellation-safe loading
-    Camera           Fixed, portrait-aware framing; no OrbitControls
-    Renderer / Loop  GPU lifecycle, bounded RAF scheduling
+    Camera           Fixed, portrait-aware framing, decaying impact shake; no OrbitControls
+    Renderer / Loop  GPU lifecycle, post-processing pipeline, bounded RAF scheduling
 server/ScoreDatabase  Local SQLite persistence, ranking, duplicate protection
 ```
 
@@ -83,14 +84,16 @@ server/ScoreDatabase  Local SQLite persistence, ranking, duplicate protection
 - Droplets retain stable IDs. Contacts resolve once, after Rapier has drained its events. Outer porcelain cannot award points.
 - Bugs clone skinned models and own animation mixers/material variants. Geometry and textures stay shared. One data-driven actor replaces duplicate Spider/Wasp classes.
 - Retry releases dynamic bodies, actors, sensors, and round state without reloading assets or recreating the renderer.
+- Presentation: a shadowed hero spotlight on the bowl, cyan/magenta lane washes, studio reflections, HDR bloom, vignette, and FXAA. High quality adds raymarched god rays through drifting dust (`VolumeNodeMaterial`, quarter resolution, blurred) and the hero shadow; phones default to Low.
+- Feel: droplets stretch along their velocity and splash on every terminal contact; kills burst into bug-colored goo with a floating score; spawns and escapes puff; the reticle locks on over bugs and pulses on hits; the bowl ring swells as the streak charges; lane lights tint for power-ups and flash red on escapes; impacts shake the camera (off with reduced motion), splat, and buzz phones (toggle in settings). A soft hiss follows the stream.
 - Settings affect presentation and keyboard speed, not scoring. Balance values live in `src/lib/Game/config.ts`.
 - The unused character-movement prototype and testing-only OrbitControls were removed.
 
-See [the gameplay plan](docs/AIMLOW_GAME_PLAN.md) for current rules and milestones. Balance and gameplay remain open for feedback.
+See [the gameplay plan](docs/AIMLOW_GAME_PLAN.md) for current rules and milestones. Look-and-feel knobs and a browser checklist live in [the tuning guide](docs/TUNING.md). Balance and gameplay remain open for feedback.
 
 ## Checks
 
-`pnpm test` runs 31 focused Node tests using the existing esbuild dependency. This includes real Rapier simulation, animated spider grounding, wave growth/reset/pause, varied non-overlapping spawn lanes, outer-lane framing, quick-kill health and reaction windows, per-bug pace and quick-kill rewards, timed streak rewards at 30/60/120 Hz, streak interruption and cooldown, actual World-to-bowl reward integration, low-pressure shots, and temporary SQLite files for persistence, migration, ranking, duplicate protection, and result validation. No new testing framework or runtime database dependency.
+`pnpm test` runs 33 focused Node tests using the existing esbuild dependency. This includes real Rapier simulation, animated spider grounding, wave growth/reset/pause, varied non-overlapping spawn lanes, outer-lane framing, quick-kill health and reaction windows, per-bug pace and quick-kill rewards, lighting/haze layering, bounded effect pools and popup disposal, camera-shake decay, timed streak rewards at 30/60/120 Hz, streak interruption and cooldown, actual World-to-bowl reward integration, low-pressure shots, and temporary SQLite files for persistence, migration, ranking, duplicate protection, and result validation. No new testing framework or runtime database dependency.
 
 Earlier headless Chrome checks covered desktop/mobile layouts and the round lifecycle. Reaction/streak changes are covered by Node and physics tests; browser visual checks, actual phone/touch-device testing, and gameplay tuning remain separate.
 

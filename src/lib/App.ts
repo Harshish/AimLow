@@ -29,6 +29,8 @@ export default class App {
 	private initialization?: Promise<void>;
 	private disposed = false;
 	private lastNotice = 0;
+	private lastKills = 0;
+	private lastMissed = 0;
 	private publishedAt = 0;
 	private lastPhase = this.session.state.phase;
 
@@ -56,14 +58,17 @@ export default class App {
 			if (notice && notice.id !== this.lastNotice) {
 				this.lastNotice = notice.id;
 				this.audio.cue(notice.tone);
+				if (notice.tone === 'drink') this.haptic([15, 30, 15, 30, 40]);
 			}
+			this.feedback();
+			this.camera.update(dt, !this.settings.reducedMotion);
 			if (phase !== this.lastPhase) {
 				if (phase === 'playing' && this.lastPhase === 'countdown') this.audio.cue('start');
 				if (phase === 'gameover') this.audio.cue('end');
 				this.publish();
 				this.lastPhase = phase;
 			}
-			this.audio.update(phase);
+			this.audio.update(phase, this.session.state.pressure > 0);
 			this.publishedAt += dt;
 			if (this.publishedAt >= 1 / 30) {
 				this.publish();
@@ -96,6 +101,8 @@ export default class App {
 				this.input,
 				this.camera.instance
 			);
+			const { haze, hero } = this.world.environment;
+			this.renderer.setHaze(haze.material, hero);
 			this.loop.start();
 		} catch (error) {
 			if (!this.disposed) {
@@ -134,11 +141,31 @@ export default class App {
 		this.settings = { ...settings };
 		this.audio.settings = this.settings;
 		this.input.sensitivity = settings.sensitivity;
+		this.renderer.setQuality(settings.quality);
 		this.renderer.resize(
 			window.innerWidth,
 			window.innerHeight,
 			Math.min(window.devicePixelRatio || 1, settings.quality === 'low' ? 1 : 1.5)
 		);
+	}
+	/** Kill and escape impacts: screen shake, a wet splat, and a buzz on phones. */
+	private feedback() {
+		const { kills, missed } = this.session.state;
+		if (kills > this.lastKills) {
+			this.camera.shake(0.28);
+			this.audio.splat();
+			this.haptic(14);
+		}
+		if (missed > this.lastMissed) {
+			this.camera.shake(0.55);
+			this.haptic([35, 40, 35]);
+		}
+		this.lastKills = kills;
+		this.lastMissed = missed;
+	}
+	private haptic(pattern: number | number[]) {
+		// Unsupported browsers (including iOS Safari) simply have no vibrate().
+		if (this.settings.haptics) navigator.vibrate?.(pattern);
 	}
 	private publish() {
 		gameStateStore.set(this.session.snapshot());

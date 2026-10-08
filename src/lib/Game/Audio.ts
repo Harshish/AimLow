@@ -4,6 +4,8 @@ import type { Settings } from './config';
 /** Small synthesized arcade cues: no downloaded audio, autoplay, or per-droplet sounds. */
 export default class Audio {
 	private context?: AudioContext;
+	private noise?: AudioBuffer;
+	private hiss?: GainNode;
 	private nextBeat = 0;
 	private beat = 0;
 	settings: Settings;
@@ -18,23 +20,38 @@ export default class Audio {
 			/* Audio is optional. */
 		}
 	}
+	private get running() {
+		return this.context?.state === 'running' ? this.context : undefined;
+	}
 	private tone(frequency: number, length: number, volume = 0.045, offset = 0) {
-		if (!this.context || this.context.state !== 'running') return;
-		const now = this.context.currentTime + offset;
-		const oscillator = this.context.createOscillator(),
-			gain = this.context.createGain();
+		const context = this.running;
+		if (!context) return;
+		const now = context.currentTime + offset;
+		const oscillator = context.createOscillator(),
+			gain = context.createGain();
 		oscillator.type = 'triangle';
 		oscillator.frequency.setValueAtTime(frequency, now);
 		gain.gain.setValueAtTime(volume, now);
 		gain.gain.exponentialRampToValueAtTime(0.001, now + length);
 		oscillator.connect(gain);
-		gain.connect(this.context.destination);
+		gain.connect(context.destination);
 		oscillator.start(now);
 		oscillator.stop(now + length);
 		oscillator.onended = () => {
 			oscillator.disconnect();
 			gain.disconnect();
 		};
+	}
+	/** One shared second of white noise feeds every splash and the stream hiss. */
+	private noiseSource(context: AudioContext) {
+		if (!this.noise) {
+			this.noise = context.createBuffer(1, context.sampleRate, context.sampleRate);
+			const data = this.noise.getChannelData(0);
+			for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+		}
+		const source = context.createBufferSource();
+		source.buffer = this.noise;
+		return source;
 	}
 	cue(kind: 'good' | 'bad' | 'drink' | 'quick' | 'start' | 'end') {
 		if (!this.settings.sound) return;
@@ -48,14 +65,55 @@ export default class Audio {
 						: [523, 784];
 		notes.forEach((note, i) => this.tone(note, 0.12, 0.06, i * 0.085));
 	}
-	update(phase: Phase) {
-		if (!this.context || !this.settings.music || phase !== 'playing') {
+	/** Wet splat for a kill: a falling band of noise plus a low thump. */
+	splat() {
+		const context = this.running;
+		if (!context || !this.settings.sound) return;
+		const now = context.currentTime;
+		const source = this.noiseSource(context),
+			filter = context.createBiquadFilter(),
+			gain = context.createGain();
+		filter.type = 'bandpass';
+		filter.Q.value = 1.4;
+		filter.frequency.setValueAtTime(1800, now);
+		filter.frequency.exponentialRampToValueAtTime(320, now + 0.18);
+		gain.gain.setValueAtTime(0.16, now);
+		gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+		source.connect(filter).connect(gain).connect(context.destination);
+		source.start(now, Math.random() * 0.7, 0.25);
+		source.onended = () => {
+			source.disconnect();
+			filter.disconnect();
+			gain.disconnect();
+		};
+		this.tone(90, 0.14, 0.08);
+	}
+	update(phase: Phase, flowing: boolean) {
+		const context = this.running;
+		if (context) {
+			if (!this.hiss) {
+				// A soft, continuous hiss sells the stream without per-droplet sounds.
+				const source = this.noiseSource(context),
+					filter = context.createBiquadFilter();
+				this.hiss = context.createGain();
+				this.hiss.gain.value = 0;
+				filter.type = 'bandpass';
+				filter.frequency.value = 2600;
+				filter.Q.value = 0.7;
+				source.loop = true;
+				source.connect(filter).connect(this.hiss).connect(context.destination);
+				source.start();
+			}
+			const level = this.settings.sound && flowing && phase === 'playing' ? 0.022 : 0;
+			this.hiss.gain.setTargetAtTime(level, context.currentTime, 0.08);
+		}
+		if (!context || !this.settings.music || phase !== 'playing') {
 			this.nextBeat = 0;
 			return;
 		}
-		if (this.context.currentTime >= this.nextBeat) {
+		if (context.currentTime >= this.nextBeat) {
 			this.tone([130.81, 164.81, 196, 164.81][this.beat++ % 4], 0.15, 0.025);
-			this.nextBeat = this.context.currentTime + 0.3;
+			this.nextBeat = context.currentTime + 0.3;
 		}
 	}
 	dispose() {

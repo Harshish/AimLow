@@ -52,11 +52,12 @@ import {
 	type ScoreEntry
 } from '../src/lib/Game/leaderboard';
 import EnemyManager from '../src/lib/World/EnemyManager';
-import Environment from '../src/lib/World/Environment';
+import Environment, { HAZE_LAYER } from '../src/lib/World/Environment';
 import World from '../src/lib/World/World';
-import type { LoadedAssets } from '../src/lib/Utils/Assets';
+import { assetsToLoad, type LoadedAssets } from '../src/lib/Utils/Assets';
 import { disposeResources } from '../src/lib/Utils/disposeResources';
 import Physics from '../src/lib/World/Physics';
+import Effects, { MAX_SPARKS } from '../src/lib/World/Effects';
 import { WaterJet } from '../src/lib/World/Elements/WaterJet';
 import AssetLoader from '../src/lib/Utils/AssetLoader';
 
@@ -452,7 +453,8 @@ test('real world bowl contacts charge a streak reward without collectible cans',
 		spider: bug,
 		wasp: bug,
 		floor: new THREE.Texture(),
-		wall: new THREE.Texture()
+		wall: new THREE.Texture(),
+		graffiti: new THREE.Texture()
 	};
 	const scene = new THREE.Scene();
 	const physics = await Physics.create();
@@ -471,6 +473,8 @@ test('real world bowl contacts charge a streak reward without collectible cans',
 		session.tick(3);
 		for (let frame = 0; frame < 120; frame++) world.loop(STEP, DEFAULT_SETTINGS);
 		assert.ok(session.state.bowlStreak > 1, 'actual captures charge the meter');
+		assert.ok(world.effects.active > 0, 'bowl contacts splash');
+		assert.ok(world.environment.ring.scale.x > 1, 'the bowl ring swells as the streak charges');
 		assert.equal(session.state.drink, null);
 		session.pause();
 		const paused = session.snapshot();
@@ -499,43 +503,119 @@ test('real world bowl contacts charge a streak reward without collectible cans',
 	}
 });
 
-test('colored spotlights stay high above the arena without visible beams or fixtures', async () => {
+test('hero spotlight shadows the bowl through haze while lane lights keep bugs readable', async () => {
 	const scene = new THREE.Scene();
 	const physics = await Physics.create();
+	const urinal = model();
+	urinal.scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial()));
 	const assets = {
-		urinal: model(),
+		urinal,
 		floor: new THREE.Texture(),
-		wall: new THREE.Texture()
+		wall: new THREE.Texture(),
+		graffiti: new THREE.Texture()
 	} as LoadedAssets;
 	try {
-		new Environment(scene, physics, assets);
-		const spots = scene.children.filter(
-			(child): child is THREE.SpotLight => child instanceof THREE.SpotLight
-		);
-		assert.equal(spots.length, 3);
-		assert.equal(new Set(spots.map((spot) => spot.color.getHex())).size, 3);
-		for (const spot of spots) {
-			assert.equal(spot.target.parent, scene);
-			assert.ok(spot.position.y >= 40, 'spotlights sit far above the arena');
-			assert.ok(spot.position.y > spot.target.position.y);
-			const distance = spot.position.distanceTo(spot.target.position);
-			assert.ok(spot.distance > distance, 'raised lights still reach the bowl');
-			assert.ok(spot.intensity / distance ** 2 > 2, 'falloff does not wash out the colors');
-			assert.ok(spot.penumbra > 0.5);
-			assert.equal(spot.castShadow, false, 'no extra shadow passes');
+		const environment = new Environment(scene, physics, assets);
+		const { hero, haze, accents } = environment;
+		const bowl = new THREE.Vector3(0.2, 8, 4.7);
+		assert.equal(hero.castShadow, true, 'the hero light grounds the urinal with a shadow');
+		assert.ok(hero.layers.isEnabled(HAZE_LAYER) && hero.layers.isEnabled(0));
+		assert.ok(hero.target.position.distanceTo(bowl) < 3, 'the brightest pool lands on the bowl');
+		assert.ok(hero.position.y > 25 && hero.position.x < 0, 'a high diagonal beam');
+		const throw_ = hero.position.distanceTo(hero.target.position);
+		assert.ok(hero.distance > throw_ && hero.intensity / throw_ ** 2 > 2);
+		assert.equal(accents.length, 2);
+		for (const { light, base } of accents) {
+			assert.equal(light.castShadow, false, 'only one shadow pass');
+			assert.equal(light.layers.isEnabled(HAZE_LAYER), false, 'only the hero scatters');
+			assert.ok(Math.abs(light.target.position.x) >= 7, 'washes cover a bug lane');
+			assert.equal(light.color.getHex(), base.getHex());
 		}
-		assert.equal(scene.getObjectByName('stage-light-beam'), undefined);
+		assert.notEqual(
+			Math.sign(accents[0].light.target.position.x),
+			Math.sign(accents[1].light.target.position.x)
+		);
+		const camera = new THREE.PerspectiveCamera();
+		assert.equal(haze.layers.test(camera.layers), false, 'the main camera never draws the haze');
+		assert.ok(haze.material instanceof THREE.VolumeNodeMaterial);
+		assert.ok(new THREE.Box3().setFromObject(haze).containsPoint(bowl), 'dust fills the beam');
+		assert.ok(urinal.scene.children[0].castShadow);
 		assert.equal(
-			scene.children.filter((child) => child instanceof THREE.Mesh).length,
-			3,
-			'only the aiming ring, floor, and wall add visible geometry'
+			scene.children.filter(
+				(child) => child instanceof THREE.Mesh && child.layers.test(camera.layers)
+			).length,
+			4,
+			'only the aiming ring, floor, wall, and floor tag add visible geometry'
 		);
 		const ambient = scene.children.find((child) => child instanceof THREE.HemisphereLight)!;
-		assert.ok((ambient as THREE.HemisphereLight).intensity < 1);
+		assert.ok((ambient as THREE.HemisphereLight).intensity < 0.6, 'dim fill keeps contrast');
 	} finally {
 		physics.dispose();
-		disposeResources([scene, assets.floor, assets.wall]);
+		disposeResources([scene, assets.floor, assets.wall, assets.graffiti]);
 	}
+});
+
+test('effects pool sparks, settle on the floor, expire, and release popups', (t) => {
+	const scene = new THREE.Scene();
+	const effects = new Effects(scene);
+	try {
+		effects.burst({ x: 0, y: 0.05, z: 5 }, 40, 0xffffff, { speed: 8, up: -1, life: 0.6 });
+		assert.equal(effects.active, 40);
+		for (let i = 0; i < 20; i++) effects.update(STEP);
+		const matrix = new THREE.Matrix4(),
+			point = new THREE.Vector3();
+		for (let i = 0; i < effects.sparks.count; i++) {
+			effects.sparks.getMatrixAt(i, matrix);
+			assert.ok(point.setFromMatrixPosition(matrix).y >= 0.03 - 1e-6, 'sparks skid, never sink');
+		}
+		effects.update(1);
+		assert.equal(effects.active, 0, 'every spark expires');
+		effects.burst({ x: 0, y: 5, z: 5 }, MAX_SPARKS * 2, 0xffffff);
+		assert.equal(effects.active, MAX_SPARKS, 'the pool never grows');
+		effects.reset();
+		effects.kill({ x: 0, y: 5, z: 5 }, 'wasp', true, 412, true);
+		assert.equal(scene.children.filter((child) => child instanceof THREE.Sprite).length, 0);
+
+		const disposed: string[] = [];
+		mockGlobal(t, 'document', {
+			createElement: () => ({
+				width: 0,
+				height: 0,
+				getContext: () => new Proxy({}, { get: () => () => {}, set: () => true })
+			})
+		});
+		effects.kill({ x: 0, y: 5, z: 5 }, 'spider', false, 150, false);
+		const popup = scene.children.find((child) => child instanceof THREE.Sprite) as THREE.Sprite;
+		assert.ok(popup, 'kills show their points where the bug died');
+		popup.material.addEventListener('dispose', () => disposed.push('material'));
+		popup.material.map!.addEventListener('dispose', () => disposed.push('texture'));
+		const start = popup.position.y;
+		effects.update(0.3);
+		assert.ok(popup.position.y > start, 'popups drift upward');
+		effects.update(1);
+		assert.equal(scene.children.includes(popup), false);
+		assert.deepEqual(disposed.sort(), ['material', 'texture']);
+	} finally {
+		effects.dispose();
+	}
+	assert.equal(scene.children.includes(effects.sparks), false);
+});
+
+test('camera shake decays back to the framed position and respects reduced motion', (t) => {
+	mockGlobal(t, 'window', browserWindow());
+	const camera = new Camera();
+	const framed = camera.instance.position.clone();
+	camera.shake(1);
+	camera.update(STEP, false);
+	assert.ok(camera.instance.position.equals(framed), 'reduced motion never moves the view');
+	camera.shake(1);
+	camera.update(STEP, true);
+	assert.ok(camera.instance.position.distanceTo(framed) > 0, 'impacts jolt the view');
+	for (let i = 0; i < 60; i++) camera.update(STEP, true);
+	assert.ok(camera.instance.position.equals(framed), 'trauma fully decays');
+	camera.resize(390, 844);
+	camera.update(STEP, true);
+	assert.notEqual(camera.instance.position.y, framed.y, 'shake follows the resized framing');
 });
 
 test('shared GPU resources and ImageBitmaps are disposed only once', (t) => {
@@ -747,7 +827,14 @@ test('jet captures the inner bowl at varied angles and rescues low pressure in e
 			);
 		})
 	);
-	const assets = { urinal, spider, wasp, floor: new THREE.Texture(), wall: new THREE.Texture() };
+	const assets = {
+		urinal,
+		spider,
+		wasp,
+		floor: new THREE.Texture(),
+		wall: new THREE.Texture(),
+		graffiti: new THREE.Texture()
+	};
 	try {
 		const cases: [number, number, DrinkKind | null, number, number?, number?][] = ENEMY_LANES.map(
 			(_, lane) => [lane, 5, null, 1]
@@ -878,7 +965,14 @@ test('jet captures the inner bowl at varied angles and rescues low pressure in e
 			}
 		}
 	} finally {
-		disposeResources([urinal.scene, spider.scene, wasp.scene, assets.floor, assets.wall]);
+		disposeResources([
+			urinal.scene,
+			spider.scene,
+			wasp.scene,
+			assets.floor,
+			assets.wall,
+			assets.graffiti
+		]);
 	}
 });
 
@@ -954,7 +1048,7 @@ test('bug pace varies: fast bugs move sooner, escape sooner, glow, and quick kil
 		}
 		session.start();
 		session.tick(3);
-		session.kill('spider', fast, 0.9);
+		assert.equal(session.kill('spider', fast, 0.9), killReward('spider', fast, 0.9));
 		assert.equal(session.state.score, killReward('spider', fast, 0.9));
 		assert.equal(session.state.notice!.tone, 'quick');
 		assert.match(session.state.notice!.text, /0\.90s QUICK KILL/);
@@ -1065,7 +1159,7 @@ test('enemies clone independently, reward final-tick kills once, and penalize ti
 		const wasp = manager.enemies.get(2)!;
 		assert.notEqual(spider.root, wasp.root);
 		assert.equal(manager.enemies.size, 2);
-		spider.age = BUGS.spider.deadline + 0.3;
+		spider.age = spider.deadline + 0.3;
 		spider.health = 0.3;
 		const beforeKill = session.state.pressure;
 		assert.equal(manager.hit(1), true);
@@ -1078,7 +1172,7 @@ test('enemies clone independently, reward final-tick kills once, and penalize ti
 			beforeKill + KILL_PRESSURE_GAIN,
 			'kill refills exactly once'
 		);
-		wasp.age = BUGS.wasp.deadline + 0.3;
+		wasp.age = wasp.deadline + 0.3;
 		const pressure = session.state.pressure;
 		manager.resolveDeadlines();
 		manager.resolveDeadlines();
@@ -1580,8 +1674,8 @@ test('assets load together and report completion without global readiness subscr
 	const progress: number[] = [];
 	try {
 		const assets = await loader.load((value) => progress.push(value));
-		assert.equal(Object.keys(assets).length, 5);
-		assert.equal(progress.length, 5);
+		assert.equal(Object.keys(assets).length, assetsToLoad.length);
+		assert.equal(progress.length, assetsToLoad.length);
 		assert.equal(progress.at(-1), 1);
 		assert.ok(assets.urinal.scene instanceof THREE.Group);
 		assert.ok(assets.floor instanceof THREE.Texture);
@@ -1607,7 +1701,7 @@ test('assets completing after disposal release resources and do not publish prog
 	finish(texture);
 	await assert.rejects(loading, /Failed to load/);
 	assert.equal(progress, 0);
-	assert.equal(disposals, 2);
+	assert.equal(disposals, assetsToLoad.filter((asset) => asset.type === 'texture').length);
 });
 
 test('asset errors identify the failing URL instead of leaving loading stuck', async (t) => {
