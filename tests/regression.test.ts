@@ -1,10 +1,6 @@
 import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
-import ScoreDatabase from '../src/lib/server/ScoreDatabase';
+import { readFileSync } from 'node:fs';
 import * as THREE from 'three/webgpu';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import Loop from '../src/lib/Utils/Loop';
@@ -1631,89 +1627,39 @@ test('leaderboard validates untrusted results, sorts, deduplicates, and survives
 	assert.equal(saved.persisted, false);
 	assert.equal(saved.scores.length, 1);
 	assert.equal(saved.scores[0].score, 250);
+	assert.equal(saved.rank, 0);
 });
 
-test('SQLite persists scores, rejects changed retries, ranks, and bounds local boards', (t) => {
-	const directory = mkdtempSync(join(tmpdir(), 'aimlow-scores-'));
-	const filename = join(directory, 'scores.sqlite');
-	let database = new ScoreDatabase(filename);
-	t.after(() => {
-		database.close();
-		rmSync(directory, { recursive: true, force: true });
+test('only top-10 runs are recorded; a run that misses the board never touches storage', (t) => {
+	const writes: string[] = [];
+	mockGlobal(t, 'localStorage', {
+		getItem: () => null,
+		setItem: (_: string, v: string) => writes.push(v)
 	});
-	const entry: ScoreEntry = {
-		id: 'sqlite-run',
-		name: "O'NEIL",
-		score: 200,
-		accuracy: 0.9,
-		kills: 1,
-		missed: 0,
-		duration: 10,
-		timestamp: '2000-01-01T00:00:00Z',
-		rulesVersion: RULES_VERSION
-	};
-	const saved = database.save(entry)!;
-	assert.equal(saved.name, entry.name);
-	assert.notEqual(saved.timestamp, entry.timestamp, 'database records its own receipt time');
-	assert.deepEqual(database.save(entry), saved);
-	assert.equal(database.save({ ...entry, score: 201 }), null);
-	assert.equal(database.list('daily').length, 1);
-	database.close();
-	database = new ScoreDatabase(filename);
-	assert.deepEqual(database.list('all-time'), [saved]);
-	for (let i = 0; i < 55; i++) database.save({ ...entry, id: `run-${i}`, score: i });
-	const scores = database.list('all-time');
-	assert.equal(scores.length, 50);
-	assert.equal(scores[0].id, entry.id);
-	assert.equal(scores[1].score, 54);
-});
-
-test('SQLite upgrades the old duration constraint without losing scores and saves extended runs', (t) => {
-	const directory = mkdtempSync(join(tmpdir(), 'aimlow-upgrade-'));
-	const filename = join(directory, 'scores.sqlite');
-	const legacy = new DatabaseSync(filename);
-	legacy.exec(`CREATE TABLE scores (
-		id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, score INTEGER NOT NULL,
-		accuracy REAL, kills INTEGER NOT NULL, missed INTEGER NOT NULL,
-		duration REAL NOT NULL CHECK(duration > 0 AND duration <= 80.1),
-		rules_version TEXT NOT NULL, created_at TEXT NOT NULL
-	) STRICT;
-	CREATE INDEX scores_ranking ON scores(rules_version, score DESC, accuracy DESC, created_at, id);
-	INSERT INTO scores VALUES ('legacy', 'PLAYER', 200, 0.9, 1, 0, 10, 'arcade-1', '2026-01-01T00:00:00Z');`);
-	legacy.close();
-	let database = new ScoreDatabase(filename);
-	t.after(() => {
-		database.close();
-		rmSync(directory, { recursive: true, force: true });
-	});
-	const entry: ScoreEntry = {
-		id: 'extended',
+	const run = (id: string, score: number): ScoreEntry => ({
+		id,
 		name: 'PLAYER',
-		score: 8000,
-		accuracy: 0.9,
-		kills: 20,
-		missed: 1,
-		duration: 180,
-		rulesVersion: RULES_VERSION,
-		timestamp: '2026-01-01T00:00:00Z'
-	};
-	assert.ok(validEntry(entry));
-	assert.equal(database.save(entry)?.duration, 180);
-	database.close();
-	database = new ScoreDatabase(filename);
-	assert.equal(database.list('all-time')[0].id, entry.id);
-	const inspect = new DatabaseSync(filename);
-	try {
-		assert.equal(inspect.prepare("SELECT score FROM scores WHERE id = 'legacy'").get()!.score, 200);
-		assert.ok(
-			inspect
-				.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'scores_ranking'")
-				.get()
-		);
-		assert.equal(inspect.prepare('PRAGMA user_version').get()!.user_version, 1);
-	} finally {
-		inspect.close();
-	}
+		score,
+		accuracy: 0.5,
+		kills: 0,
+		missed: 0,
+		duration: 60,
+		timestamp: '2026-01-01T00:00:00Z',
+		rulesVersion: RULES_VERSION
+	});
+	let scores: ScoreEntry[] = [];
+	for (let i = 1; i <= 10; i++) scores = saveScore(scores, run(`r${i}`, i * 100)).scores;
+	assert.equal(scores.length, 10);
+	assert.equal(writes.length, 10);
+	const miss = saveScore(scores, run('low', 50));
+	assert.equal(miss.rank, -1);
+	assert.equal(miss.scores, scores, 'board unchanged');
+	assert.equal(writes.length, 10, 'missed run is not written');
+	const hit = saveScore(scores, run('high', 550));
+	assert.equal(hit.rank, 5);
+	assert.equal(hit.scores.length, 10);
+	assert.ok(!hit.scores.some((s) => s.id === 'r1'), 'lowest score drops off');
+	assert.equal(writes.length, 11);
 });
 
 test('assets load together and report completion without global readiness subscriptions', async (t) => {

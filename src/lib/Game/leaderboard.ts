@@ -77,15 +77,18 @@ export function loadScores(): ScoreEntry[] {
 		return [];
 	}
 }
+/** Arcade rules: only a top-10 run is recorded. `rank` is its 0-based place, or -1 if it missed. */
 export function saveScore(entries: ScoreEntry[], entry: ScoreEntry) {
 	const scores = rankScores([...entries.filter((s) => s.id !== entry.id), entry]).slice(0, 10);
+	const rank = scores.findIndex((s) => s.id === entry.id);
+	if (rank < 0) return { scores: entries, rank, persisted: true };
 	let persisted = true;
 	try {
 		localStorage.setItem(SCORE_KEY, JSON.stringify(scores));
 	} catch {
 		persisted = false;
 	}
-	return { scores, persisted };
+	return { scores, rank, persisted };
 }
 export function resultTitle(result: RoundResult) {
 	return (result.accuracy ?? 0) >= 0.8
@@ -95,28 +98,6 @@ export function resultTitle(result: RoundResult) {
 			: result.score >= 2000
 				? 'NATURAL TALENT'
 				: 'FLOOR MANAGER';
-}
-
-async function request(path: string, body?: unknown) {
-	const response = await fetch(path, {
-		method: body === undefined ? 'GET' : 'POST',
-		headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
-		body: body === undefined ? undefined : JSON.stringify(body),
-		signal: AbortSignal.timeout(8000)
-	});
-	if (!response.ok) {
-		const data = await response.json().catch(() => null);
-		throw new Error(data?.message ?? 'Leaderboard unavailable. Your local score is safe.');
-	}
-	return response.json();
-}
-export async function submitScore(entry: ScoreEntry): Promise<void> {
-	await request('/api/scores', { entry });
-}
-export async function databaseScores(period: 'daily' | 'all-time'): Promise<ScoreEntry[]> {
-	const data = await request(`/api/leaderboard?period=${period}`);
-	if (!Array.isArray(data)) throw new Error('Invalid leaderboard response.');
-	return data.filter(validEntry);
 }
 
 export async function shareScore(entry: ScoreEntry): Promise<'shared' | 'downloaded'> {

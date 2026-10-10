@@ -20,8 +20,6 @@
 		validName,
 		resultTitle,
 		shareScore,
-		submitScore,
-		databaseScores,
 		type ScoreEntry
 	} from '$lib/Game/leaderboard';
 	import Hud from '$lib/UI/Hud.svelte';
@@ -34,10 +32,7 @@
 		error = $state('');
 	let panel = $state<'home' | 'party' | 'board' | 'help' | 'settings'>('home');
 	let settings = $state({ ...DEFAULT_SETTINGS });
-	let scores = $state<ScoreEntry[]>([]),
-		board = $state<ScoreEntry[]>([]);
-	let boardTab = $state<'local' | 'daily' | 'all-time'>('local'),
-		boardStatus = $state('');
+	let scores = $state<ScoreEntry[]>([]);
 	let name = $state('PLAYER'),
 		partyNames = $state('PLAYER 1\nPLAYER 2'),
 		party = $state<string[]>([]),
@@ -45,14 +40,11 @@
 		partyScores = $state<ScoreEntry[]>([]);
 	let formError = $state(''),
 		storageMessage = $state(''),
-		shareMessage = $state(''),
-		databaseStatus = $state('');
-	let submitting = $state(false);
-	let databaseSaved = $state(false);
+		shareMessage = $state('');
+	let rank = $state(-1);
 	let entry = $state<ScoreEntry | null>(null);
 	let run: { id: string; name: string } | null = null;
 	let completedId = '';
-	let boardRequest = 0;
 	let mounted = false;
 	let focusPanel = $state<HTMLElement>();
 	const phase = $derived($gameStateStore.phase);
@@ -83,7 +75,6 @@
 		void initialize();
 		return () => {
 			mounted = false;
-			boardRequest++;
 			app?.dispose();
 		};
 	});
@@ -105,11 +96,11 @@
 			};
 			const saved = saveScore(scores, entry);
 			scores = saved.scores;
+			rank = saved.rank;
 			storageMessage = saved.persisted
 				? ''
 				: 'Storage unavailable. Scores stay here until you close this page.';
 			if (party.length) partyScores = [...partyScores, entry];
-			void submit();
 		}
 	});
 	$effect(() => {
@@ -120,10 +111,7 @@
 
 	function startRound() {
 		shareMessage = '';
-		databaseStatus = '';
 		entry = null;
-		submitting = false;
-		databaseSaved = false;
 		run = { id: crypto.randomUUID(), name: playerName(currentName) };
 		app?.start();
 	}
@@ -159,48 +147,6 @@
 		panel = 'home';
 		run = null;
 		entry = null;
-	}
-	async function showBoard(tab: typeof boardTab = 'local') {
-		panel = 'board';
-		boardTab = tab;
-		boardStatus = '';
-		const requestId = ++boardRequest;
-		if (tab === 'local') {
-			board = scores;
-			return;
-		}
-		board = [];
-		boardStatus = 'Loading scores…';
-		try {
-			const entries = await databaseScores(tab);
-			if (mounted && requestId === boardRequest) {
-				board = entries;
-				boardStatus = '';
-			}
-		} catch (cause) {
-			if (mounted && requestId === boardRequest)
-				boardStatus = cause instanceof Error ? cause.message : 'Local database unavailable.';
-		}
-	}
-	async function submit() {
-		if (!run || !entry || submitting) return;
-		const completedRun = run,
-			completedEntry = entry;
-		submitting = true;
-		databaseStatus = 'Saving to local SQLite…';
-		try {
-			await submitScore(completedEntry);
-			if (mounted && run?.id === completedRun.id) {
-				databaseSaved = true;
-				databaseStatus = 'Score saved to local SQLite.';
-			}
-		} catch (cause) {
-			if (mounted && run?.id === completedRun.id)
-				databaseStatus =
-					cause instanceof Error ? cause.message : 'Save failed. Your browser copy is safe.';
-		} finally {
-			if (mounted && run?.id === completedRun.id) submitting = false;
-		}
 	}
 	async function share() {
 		if (!entry) return;
@@ -298,7 +244,7 @@
 				<div class="menu-actions">
 					<button class="secondary" onclick={() => (panel = 'party')}
 						>PARTY PLAY <span>2–8</span></button
-					><button class="secondary" onclick={() => void showBoard()}>HIGH SCORES ↗</button>
+					><button class="secondary" onclick={() => (panel = 'board')}>HIGH SCORES ↗</button>
 				</div>
 				<div class="minor-actions">
 					<button class="text-button" onclick={() => (panel = 'help')}>HOW TO PLAY</button><span>
@@ -334,7 +280,6 @@
 						class="back text-button"
 						onclick={() => {
 							panel = 'home';
-							boardRequest++;
 						}}>← BACK TO THE BATHROOM</button
 					>
 					{#if panel === 'party'}
@@ -355,26 +300,8 @@
 					{:else if panel === 'board'}
 						<span class="eyebrow">THE WALL OF FAME</span>
 						<h2>HIGH<br /><em>SCORES.</em></h2>
-						<div class="tabs" aria-label="Leaderboard period">
-							{#each ['local', 'daily', 'all-time'] as tab (tab)}<button
-									class:active={boardTab === tab}
-									aria-pressed={boardTab === tab}
-									onclick={() => void showBoard(tab as typeof boardTab)}
-									>{tab === 'local'
-										? 'THIS BROWSER'
-										: tab === 'daily'
-											? 'DAILY · UTC'
-											: 'ALL TIME'}</button
-								>{/each}
-						</div>
-						{#if boardStatus}<p class="status" role="status">{boardStatus}</p>{:else}<Scoreboard
-								scores={board}
-							/>{/if}
-						<p class="fine-print">
-							{boardTab === 'local'
-								? 'Your top 10, backed up in this browser.'
-								: 'Top 50 scores from your local SQLite database. Nothing is sent to a cloud service.'}
-						</p>
+						<Scoreboard {scores} />
+						<p class="fine-print">Top 10 only. A run that misses the board is not recorded.</p>
 					{:else if panel === 'help'}
 						<span class="eyebrow">THE SHORT VERSION</span>
 						<h2>MAKE EVERY<br /><em>DROP COUNT.</em></h2>
@@ -544,18 +471,17 @@
 						>{/if}<button class="secondary" onclick={() => void share()}>SHARE SCORE</button>
 				</div>
 				<div class="minor-actions">
-					{#if !databaseSaved}<button
-							class="text-button"
-							disabled={submitting}
-							onclick={() => void submit()}>{submitting ? 'SAVING…' : 'RETRY SAVE'}</button
-						><span>/</span>{/if}<button class="text-button" onclick={() => void copyLink()}
-						>COPY LINK</button
-					><span>/</span><button class="text-button" onclick={mainMenu}>MENU</button>
+					<button class="text-button" onclick={() => void copyLink()}>COPY LINK</button><span
+						>/</span
+					><button class="text-button" onclick={mainMenu}>MENU</button>
 				</div>
-				{#if databaseStatus || storageMessage || shareMessage}<p class="fine-print" role="status">
-						{shareMessage || databaseStatus}
-						{storageMessage}
-					</p>{/if}
+				<p class="fine-print" role="status">
+					{shareMessage ||
+						(rank < 0
+							? `Missed the top 10. Beat ${scores.at(-1)?.score.toLocaleString()} to get on the board.`
+							: `#${rank + 1} on the high scores.`)}
+					{storageMessage}
+				</p>
 			</section>
 		</div>
 	{/if}
@@ -847,32 +773,10 @@
 	.panel .error {
 		color: var(--coral);
 	}
-	.tabs {
-		display: flex;
-		gap: 0.4rem;
-		margin-top: 1.7rem;
-	}
-	.tabs button {
-		border: 1px solid var(--line);
-		border-radius: 6px;
-		padding: 0.75rem 0.8rem;
-		color: var(--muted);
-		background: transparent;
-		font: 700 0.6rem var(--mono);
-		flex: 1;
-	}
-	.tabs button.active {
-		color: var(--ink);
-		background: var(--mint);
-		border-color: var(--mint);
-	}
 	.panel .fine-print {
 		font: 0.62rem/1.6 var(--mono);
 		color: var(--muted);
 		margin-bottom: 0;
-	}
-	.status {
-		padding: 1rem 0;
 	}
 	.instructions {
 		list-style: none;

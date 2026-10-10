@@ -9,12 +9,6 @@ node_modules
 /build
 graphify-out/
 
-# Local score database and SQLite journal files
-.data/
-*.sqlite
-*.sqlite-shm
-*.sqlite-wal
-
 # OS
 .DS_Store
 Thumbs.db

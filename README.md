@@ -1,12 +1,12 @@
 # Aim Low
 
-**Low aim. High scores.** A local browser arcade party game built with SvelteKit, Three.js, Rapier, and SQLite.
+**Low aim. High scores.** A local browser arcade party game built with SvelteKit, Three.js, and Rapier.
 
 Test your reactions: snap to animated spiders and wasps for quick burst kills, then return to the bowl. Faster reactions and faster bugs pay more. A clean 2.5-second bowl streak earns a stream power-up. When the tank empties, compare scores and pass the device.
 
 ## Run locally
 
-Use **Node.js 22.13+** and pnpm. SQLite comes from Node's built-in `node:sqlite` module; no database installation or cloud account is needed.
+Use **Node.js 22.13+** and pnpm. No database, server API, or cloud account.
 
 ```sh
 pnpm install
@@ -41,27 +41,17 @@ The game includes solo play, 2–8-player same-device party play, leaderboards, 
 
 ## Local score storage
 
-Scores save automatically at the end of each round:
+Arcade style: type a name, play. At the end of a round the score is recorded only if it makes the top 10; otherwise it is shown and discarded.
 
-- **SQLite:** `.data/aimlow.sqlite`, created automatically. Daily (UTC) and all-time boards show the top 50 scores for the current rules version.
-- **Browser backup:** the top 10 scores stay in versioned `localStorage`. A database error does not lose the visible result or stop the next round. The results screen offers a retry.
+- **High scores:** the top 10 for the current rules version, in versioned `localStorage`. If storage is unavailable, the board lives in memory until the page closes.
 - **Party standings:** an in-memory ranking for the current group of players.
 
-No scores are sent to a cloud service. The local app uses two same-origin endpoints:
-
-| Route                                         | Purpose                                        |
-| --------------------------------------------- | ---------------------------------------------- |
-| `POST /api/scores`                            | Validate and save a completed round to SQLite. |
-| `GET /api/leaderboard?period=daily\|all-time` | Read local SQLite rankings.                    |
-
-Queries are parameterized. A unique run ID makes retries idempotent; submitting different results with the same ID cannot overwrite an existing score. Request bodies and result sizes are bounded. Scores are casual and client-reported, not a competitive anti-cheat system.
-
-The database and its SQLite journal files are ignored by Git. To choose a different local file, copy `.env.example` to `.env` and set `AIMLOW_DB_PATH`. Stop the app before copying/removing its database files. No credentials, tokens, migrations to apply, or separate database process.
+Scores are casual and client-reported, not a competitive anti-cheat system. Stored entries are validated on load; malformed data is dropped.
 
 ## Runtime design
 
 ```text
-+page.svelte          UI flow, party turns, local results and SQLite save status
++page.svelte          UI flow, party turns, results and top-10 status
   Hud / Scoreboard   Presentational components
   App                Startup, input/audio wiring, UI snapshots, teardown
     Session          Pure rules: phases, pressure, score, bowl streaks, power-ups, results
@@ -75,7 +65,6 @@ The database and its SQLite journal files are ignored by Git. To choose a differ
     AssetLoader      Shared GLTF/texture ownership, cancellation-safe loading
     Camera           Fixed, portrait-aware framing, decaying impact shake; no OrbitControls
     Renderer / Loop  GPU lifecycle, post-processing pipeline, bounded RAF scheduling
-server/ScoreDatabase  Local SQLite persistence, ranking, duplicate protection
 ```
 
 - Constructor injection, not a singleton, service locator, event bus, or ECS.
@@ -93,7 +82,7 @@ See [the gameplay plan](docs/AIMLOW_GAME_PLAN.md) for current rules and mileston
 
 ## Checks
 
-`pnpm test` runs 33 focused Node tests using the existing esbuild dependency. This includes real Rapier simulation, animated spider grounding, wave growth/reset/pause, varied non-overlapping spawn lanes, outer-lane framing, quick-kill health and reaction windows, per-bug pace and quick-kill rewards, lighting/haze layering, bounded effect pools and popup disposal, camera-shake decay, timed streak rewards at 30/60/120 Hz, streak interruption and cooldown, actual World-to-bowl reward integration, low-pressure shots, and temporary SQLite files for persistence, migration, ranking, duplicate protection, and result validation. No new testing framework or runtime database dependency.
+`pnpm test` runs 33 focused Node tests using the existing esbuild dependency. This includes real Rapier simulation, animated spider grounding, wave growth/reset/pause, varied non-overlapping spawn lanes, outer-lane framing, quick-kill health and reaction windows, per-bug pace and quick-kill rewards, lighting/haze layering, bounded effect pools and popup disposal, camera-shake decay, timed streak rewards at 30/60/120 Hz, streak interruption and cooldown, actual World-to-bowl reward integration, low-pressure shots, top-10-only score recording, and result validation. No new testing framework.
 
 Earlier headless Chrome checks covered desktop/mobile layouts and the round lifecycle. Reaction/streak changes are covered by Node and physics tests; browser visual checks, actual phone/touch-device testing, and gameplay tuning remain separate.
 

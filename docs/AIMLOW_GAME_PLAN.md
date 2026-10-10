@@ -1,6 +1,6 @@
 # Aim Low — Game Design and Implementation Plan
 
-**Status:** Local arcade implementation and SQLite persistence are implemented. Current focus is gameplay feedback, not public launch. Balance values remain playtest defaults. See `README.md` for local setup and checks.
+**Status:** Local arcade implementation and the browser top-10 board are implemented. Current focus is gameplay feedback, not public launch. Balance values remain playtest defaults. See `README.md` for local setup and checks.
 
 ## 1. Game pitch
 
@@ -18,7 +18,7 @@ The tone is cartoon bathroom chaos, not realistic anatomy. Fast restarts, readab
 - Accurate containment/spill scoring and a pressure-based round timer.
 - Two drink power-ups: beer-style and coffee-style.
 - Arcade menu, HUD, pause, results, and immediate retry.
-- Local SQLite leaderboard, browser score backup, and same-device party play. No cloud database or launch work.
+- Browser top-10 leaderboard (only ranking runs are recorded) and same-device party play. No database or launch work.
 - No OrbitControls in the shipped game.
 
 Do not add multiplayer networking, accounts, an inventory, an ECS, a new physics engine, or realistic fluid simulation. Reuse Svelte, Three.js, Rapier, and the existing test runner.
@@ -192,7 +192,7 @@ Main actions:
 
 1. **Play** — one run, minimal friction.
 2. **Party Play** — enter 2–8 short names and take turns on the same device.
-3. **Leaderboard** — browser backup plus daily and all-time scores from local SQLite.
+3. **Leaderboard** — top 10 scores in this browser. A run is recorded only if it makes the top 10.
 4. **How to Play** — three instructions: “Aim inside. Blast bugs. Watch pressure.”
 5. **Settings** — sound/music, sensitivity, reduced motion, and quality.
 
@@ -217,28 +217,15 @@ Main actions:
 
 ## 6. Leaderboard plan
 
-### Local arcade board — first playable version
+### Arcade board — top 10 only
+
+The player enters a name and starts. No registration, accounts, or database. A finished run is written only if it ranks in the top 10; otherwise the results screen shows the score to beat.
 
 - Store the top 10 scores in versioned `localStorage`.
 - Entry fields: run ID, short display name, integer score, accuracy, kills, active duration, timestamp, and rules version.
 - Sort by score descending, then accuracy descending, then achievement time ascending.
 - Validate stored data; recover from malformed data and unavailable/full storage. Keep an in-memory board when persistence fails.
-- Show “This browser” explicitly. Browser storage is a backup; the local SQLite file is the persistent score database.
 - Party session standings are separate from saved personal scores and reset when a new party begins.
-
-### SQLite board — local only
-
-Use Node's built-in `node:sqlite` with `.data/aimlow.sqlite`. Create the table automatically on first use. No cloud provider, credentials, external database process, accounts, or run-token service.
-
-- `POST /api/scores` validates and automatically saves a completed round.
-- `GET /api/leaderboard?period=daily|all-time` returns up to 50 current-rules scores. Daily uses UTC boundaries.
-- Use parameterized queries and a unique run ID. Identical retries return the stored result; changed retries never overwrite it.
-- Validate finite score/statistic ranges and names. Bound request bodies and returned rows.
-- Record receipt timestamps in the local database and separate rules versions.
-- Keep the browser backup and current result usable if SQLite is unavailable. Offer a save retry without blocking the next game.
-- Ignore the database and its journal files in Git. `AIMLOW_DB_PATH` can override the default local path.
-
-Scores are casual and client-reported. Public hosting, moderation infrastructure, anti-cheat, and deployment planning are outside the current scope.
 
 ## 7. Minimal implementation structure
 
@@ -259,8 +246,7 @@ Preserve the existing constructor-injected ownership model. Do not introduce a g
 | `src/lib/World/EnemyManager.ts` — new                              | Spawn cadence, active-enemy lookup, health/deadlines, one-time rewards/penalties, cleanup. Implemented with one data-driven `Elements/Enemy.ts`; duplicate Spider/Wasp classes removed. |
 | `src/lib/World/Elements/DrinkPickup.ts` — new                      | One simple timed pickup and hit feedback. The session owns the active effect.                                                                                                           |
 | `src/routes/+page.svelte` and `src/lib/UI/`                        | Compose menu, HUD, and results. Split components when they have distinct behavior; no UI framework dependency.                                                                          |
-| `src/lib/Game/leaderboard.ts` — new                                | Browser backup validation, sorting, and local SQLite API request helpers.                                                                                                               |
-| `src/routes/api/` and `src/lib/server/ScoreDatabase.ts`            | Local score validation, SQLite persistence and ranking. No cloud service or separate database process.                                                                                  |
+| `src/lib/Game/leaderboard.ts` — new                                | Top-10 browser board: validation, sorting, record-only-if-ranked.                                                                                                                       |
 | `tests/regression.test.ts`                                         | Rule, collision, timer, reset, and persistence regressions through the current runner.                                                                                                  |
 
 ### Timing, reset, and resource rules
@@ -324,13 +310,12 @@ Build in this order. Each milestone should produce something playable or indepen
 
 ### Milestone 6 — Local persistence and gameplay iteration
 
-- [x] Use built-in SQLite with automatic schema creation and a Git-ignored local file.
-- [x] Add validation, idempotent saves, ranking, and rules-version separation.
-- [x] Add daily/all-time local boards, browser backup, and save retry.
-- [x] Test SQLite persistence across reopening, duplicate protection, ranking, and result bounds.
+- [x] Arcade top-10 board in versioned `localStorage`; only ranking runs are recorded. SQLite and API routes removed.
+- [x] Add validation, ranking, and rules-version separation.
+- [x] Test top-10 recording, ranking, corrupt storage, and result bounds.
 - [ ] Incorporate the user's next gameplay inputs before expanding scope.
 
-**Exit check:** Scores survive restarting the local app. Duplicate and invalid requests are handled correctly. A database failure does not interrupt play.
+**Exit check:** Top-10 scores survive a page reload. Non-ranking runs leave the board untouched. Storage failure does not interrupt play.
 
 ## 9. Gameplay validation checklist
 
@@ -344,7 +329,7 @@ Reuse `pnpm test` and the current Node/esbuild setup. Add focused cases for:
 - Enemy clone independence, active caps, single kill/timeout outcomes, same-tick hit/deadline order, and cleanup of collider mappings.
 - Drink refresh/replacement, pressure composition, and restoration without multiplier drift.
 - Local leaderboard validation/sorting, corrupt storage, and unavailable storage.
-- Local API input rejection, SQLite persistence, duplicate saves, ranking, and rules-version boundaries.
+- Top-10-only recording and rules-version boundaries.
 
 Run at each implementation milestone:
 
@@ -375,7 +360,7 @@ pnpm build
 3. **Balance:** All numeric values are proposals. Tune spill severity, bug health/deadlines, pressure drain, and beer spread together; wide spray must feel risky, not unusable.
 4. **Target devices:** Desktop and mobile browsers are planned, but define the actual test matrix before performance sign-off.
 5. **Gameplay feedback:** Wait for the user's next inputs before adding mechanics or expanding infrastructure.
-6. **Storage scope:** SQLite stays local. No public-launch or cloud-database work.
+6. **Storage scope:** Browser top 10 only. No database, public-launch, or cloud work.
 
 ## 11. Original-request coverage
 
