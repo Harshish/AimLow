@@ -102,8 +102,7 @@ export default class App {
 				this.input,
 				this.camera.instance
 			);
-			const { haze, hero } = this.world.environment;
-			this.renderer.setHaze(haze.material, hero);
+			this.world.environment.hero.castShadow = this.settings.quality === 'high';
 			this.prewarm();
 			// Starts suspended (no gesture yet); the play click resumes it without a stall.
 			this.audio.prepare();
@@ -146,9 +145,9 @@ export default class App {
 		this.settings = { ...settings };
 		this.audio.settings = this.settings;
 		this.input.sensitivity = settings.sensitivity;
-		this.renderer.setQuality(settings.quality);
 		// Only quality changes the pixel ratio; toggles and sliders must not reallocate GPU targets.
 		if (qualityChanged) {
+			if (this.world) this.world.environment.hero.castShadow = settings.quality === 'high';
 			this.resize.update();
 			// Quality toggles the hero shadow, which changes every lit shader: rebuild them now.
 			this.prewarm();

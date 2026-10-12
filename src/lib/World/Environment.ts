@@ -1,12 +1,8 @@
 import * as THREE from 'three/webgpu';
-import { Fn, color, texture, texture3D, time, uniform, vec3, screenCoordinate } from 'three/tsl';
-import { ImprovedNoise } from 'three/addons/math/ImprovedNoise.js';
-import { bayer16 } from 'three/addons/tsl/math/Bayer.js';
+import { color, texture } from 'three/tsl';
 import type Physics from './Physics';
 import type { LoadedAssets } from '../Utils/Assets';
 
-/** Lights on this layer scatter through the haze volume; the main camera never draws it. */
-export const HAZE_LAYER = 10;
 const BACKDROP = 0x121a26;
 
 /** Static level resources live until App disposal, not until the end of a round. */
@@ -15,53 +11,62 @@ export default class Environment {
 	readonly hero: THREE.SpotLight;
 	/** Colored lane fills; World tints them for power-ups and escapes. */
 	readonly accents: { light: THREE.SpotLight; base: THREE.Color }[] = [];
-	/** Raymarched dust the hero beam scatters through; rendered only by the high-quality pass. */
-	readonly haze: THREE.Mesh<THREE.BoxGeometry, THREE.VolumeNodeMaterial>;
 	readonly ring: THREE.Mesh<THREE.TorusGeometry, THREE.MeshBasicMaterial>;
 
 	constructor(scene: THREE.Scene, physics: Physics, assets: LoadedAssets) {
 		scene.background = new THREE.Color(BACKDROP);
 		scene.fog = new THREE.Fog(BACKDROP, 45, 120);
-		// Dim fill keeps edges readable; contrast comes from the hero and lane lights.
-		scene.add(new THREE.HemisphereLight(0x9fb6ff, 0x1d1620, 0.45));
-		const key = new THREE.DirectionalLight(0xffe8d6, 0.4);
+		// Low fill: the stage stays readable, but the spotlight pool owns the contrast.
+		scene.add(new THREE.HemisphereLight(0x9fb6ff, 0x1d1620, 0.22));
+		const key = new THREE.DirectionalLight(0xffe8d6, 0.1);
 		key.position.set(-6, 18, 24);
 		scene.add(key);
 
-		// High and to the left: a visible diagonal beam and a long shadow across the bricks.
-		this.hero = new THREE.SpotLight(0xfff1dc, 2000, 70, 0.32, 0.55, 2);
-		this.hero.position.set(-7, 30, 10);
-		this.hero.target.position.set(0.2, 7, 4);
+		// Stage spotlight: a tight, hard-edged pool on the bowl, like a comic panel's focus.
+		this.hero = new THREE.SpotLight(0xfffaf2, 2600, 80, 0.3, 0.12, 2);
+		this.hero.position.set(-6, 32, 16);
+		this.hero.target.position.set(0.2, 8, 3);
 		this.hero.castShadow = true;
 		this.hero.shadow.mapSize.set(1024, 1024);
 		this.hero.shadow.bias = -0.0004;
 		this.hero.shadow.intensity = 0.9;
-		this.hero.layers.enable(HAZE_LAYER);
 		scene.add(this.hero, this.hero.target);
-		// Wide washes over each bug lane: targets pop against the darker wall.
+		// Narrow washes over each bug lane; they stop short of the bowl so it stays clean white.
 		for (const [hex, side] of [
 			[0x26d9ff, -1],
 			[0xff3fa4, 1]
 		]) {
-			const light = new THREE.SpotLight(hex, 3000, 90, Math.PI / 7, 0.8, 2);
-			light.position.set(side * 14, 34, 16);
-			light.target.position.set(side * 8, 5, 5.5);
+			const light = new THREE.SpotLight(hex, 2400, 90, Math.PI / 10, 0.5, 2);
+			light.position.set(side * 16, 34, 16);
+			light.target.position.set(side * 10, 5, 5.5);
 			scene.add(light, light.target);
 			this.accents.push({ light, base: light.color.clone() });
 		}
-
-		this.haze = new THREE.Mesh(new THREE.BoxGeometry(18, 28, 12), hazeMaterial());
-		this.haze.position.set(-2, 14, 6.5);
-		this.haze.layers.set(HAZE_LAYER);
-		scene.add(this.haze);
 
 		const urinal = assets.urinal.scene;
 		urinal.scale.setScalar(12);
 		urinal.position.set(0, 0, 2);
 		scene.add(urinal);
 		urinal.updateMatrixWorld(true);
+		// Three flat tones and an ink outline (Renderer) instead of glossy porcelain glare.
+		const gradientMap = new THREE.DataTexture(
+			new Uint8Array([70, 160, 255]),
+			3,
+			1,
+			THREE.RedFormat
+		);
+		gradientMap.minFilter = gradientMap.magFilter = THREE.NearestFilter;
+		gradientMap.needsUpdate = true;
+		const porcelain = new THREE.MeshToonMaterial({
+			color: 0xf7f6f2,
+			gradientMap,
+			side: THREE.DoubleSide
+		});
 		urinal.traverse((child) => {
-			if (!(child as THREE.Mesh).isMesh) return;
+			const mesh = child as THREE.Mesh;
+			if (!mesh.isMesh) return;
+			(mesh.material as THREE.Material).dispose();
+			mesh.material = porcelain;
 			child.castShadow = child.receiveShadow = true;
 			physics.add(child, 'fixed', 'trimesh', { kind: 'shell' });
 		});
@@ -118,39 +123,4 @@ export default class Environment {
 		decal.receiveShadow = true;
 		scene.add(decal);
 	}
-}
-
-function hazeMaterial() {
-	const material = new THREE.VolumeNodeMaterial();
-	const noise = noiseTexture();
-	const density = uniform(1.6);
-	material.steps = 14;
-	// Dithered ray starts trade banding for fine noise; the composite blur removes it.
-	material.offsetNode = bayer16(screenCoordinate);
-	material.scatteringNode = Fn(({ positionRay }: { positionRay: THREE.Node<'vec3'> }) => {
-		const drift = vec3(time.mul(0.35), time.mul(0.12), time.mul(0.2));
-		const grain = (scale: number, speed: number) =>
-			texture3D(noise, positionRay.add(drift.mul(speed)).mul(scale).mod(1), 0).r.add(0.5);
-		// Two drifting octaves read as dust in the beam rather than a flat cone.
-		const dust = grain(0.05, 1).mul(grain(0.12, 1.6));
-		return density.mix(1, dust);
-	});
-	return material;
-}
-
-function noiseTexture() {
-	// ponytail: 32³ noise is ~33k samples at load; upscale only if the dust looks blocky.
-	const size = 32;
-	const data = new Uint8Array(size ** 3);
-	const perlin = new ImprovedNoise();
-	for (let z = 0, i = 0; z < size; z++)
-		for (let y = 0; y < size; y++)
-			for (let x = 0; x < size; x++, i++) data[i] = 128 + 128 * perlin.noise(x / 4, y / 4, z / 4);
-	const noise = new THREE.Data3DTexture(data, size, size, size);
-	noise.format = THREE.RedFormat;
-	noise.minFilter = noise.magFilter = THREE.LinearFilter;
-	noise.wrapS = noise.wrapT = noise.wrapR = THREE.RepeatWrapping;
-	noise.unpackAlignment = 1;
-	noise.needsUpdate = true;
-	return noise;
 }

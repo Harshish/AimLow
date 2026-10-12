@@ -48,7 +48,7 @@ import {
 	type ScoreEntry
 } from '../src/lib/Game/leaderboard';
 import EnemyManager from '../src/lib/World/EnemyManager';
-import Environment, { HAZE_LAYER } from '../src/lib/World/Environment';
+import Environment from '../src/lib/World/Environment';
 import World from '../src/lib/World/World';
 import { assetsToLoad, type LoadedAssets } from '../src/lib/Utils/Assets';
 import { disposeResources } from '../src/lib/Utils/disposeResources';
@@ -499,7 +499,7 @@ test('real world bowl contacts charge a streak reward without collectible cans',
 	}
 });
 
-test('hero spotlight shadows the bowl through haze while lane lights keep bugs readable', async () => {
+test('hero spotlight puts the toon bowl in a hard-edged pool while lane lights keep bugs readable', async () => {
 	const scene = new THREE.Scene();
 	const physics = await Physics.create();
 	const urinal = model();
@@ -512,10 +512,10 @@ test('hero spotlight shadows the bowl through haze while lane lights keep bugs r
 	} as LoadedAssets;
 	try {
 		const environment = new Environment(scene, physics, assets);
-		const { hero, haze, accents } = environment;
+		const { hero, accents } = environment;
 		const bowl = new THREE.Vector3(0.2, 8, 4.7);
 		assert.equal(hero.castShadow, true, 'the hero light grounds the urinal with a shadow');
-		assert.ok(hero.layers.isEnabled(HAZE_LAYER) && hero.layers.isEnabled(0));
+		assert.ok(hero.penumbra <= 0.2, 'a crisp comic spotlight edge, not a soft wash');
 		assert.ok(hero.target.position.distanceTo(bowl) < 3, 'the brightest pool lands on the bowl');
 		assert.ok(hero.position.y > 25 && hero.position.x < 0, 'a high diagonal beam');
 		const throw_ = hero.position.distanceTo(hero.target.position);
@@ -523,7 +523,6 @@ test('hero spotlight shadows the bowl through haze while lane lights keep bugs r
 		assert.equal(accents.length, 2);
 		for (const { light, base } of accents) {
 			assert.equal(light.castShadow, false, 'only one shadow pass');
-			assert.equal(light.layers.isEnabled(HAZE_LAYER), false, 'only the hero scatters');
 			assert.ok(Math.abs(light.target.position.x) >= 7, 'washes cover a bug lane');
 			assert.equal(light.color.getHex(), base.getHex());
 		}
@@ -532,10 +531,12 @@ test('hero spotlight shadows the bowl through haze while lane lights keep bugs r
 			Math.sign(accents[1].light.target.position.x)
 		);
 		const camera = new THREE.PerspectiveCamera();
-		assert.equal(haze.layers.test(camera.layers), false, 'the main camera never draws the haze');
-		assert.ok(haze.material instanceof THREE.VolumeNodeMaterial);
-		assert.ok(new THREE.Box3().setFromObject(haze).containsPoint(bowl), 'dust fills the beam');
-		assert.ok(urinal.scene.children[0].castShadow);
+		const bowlMesh = urinal.scene.children[0] as THREE.Mesh;
+		assert.ok(bowlMesh.castShadow);
+		assert.ok(
+			bowlMesh.material instanceof THREE.MeshToonMaterial,
+			'toon bowl gets the ink outline'
+		);
 		assert.equal(
 			scene.children.filter(
 				(child) => child instanceof THREE.Mesh && child.layers.test(camera.layers)
