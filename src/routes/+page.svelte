@@ -279,8 +279,8 @@
 				<span class="eyebrow">EST. RIGHT NOW</span>
 			</div>
 			<footer class="home-footer">
-				<span><i>01</i> AIM INSIDE</span><span><i>02</i> BLAST BUGS</span><span
-					><i>03</i> WATCH PRESSURE</span
+				<span><i>1</i> AIM INSIDE</span><span><i>2</i> BLAST BUGS</span><span
+					><i>3</i> WATCH PRESSURE</span
 				><small>NO DOWNLOAD. NO EXCUSES.</small>
 			</footer>
 		{:else}

@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { color, texture } from 'three/tsl';
+import { color, smoothstep, texture } from 'three/tsl';
 import type Physics from './Physics';
 import type { LoadedAssets } from '../Utils/Assets';
 
@@ -116,7 +116,8 @@ export default class Environment {
 			roughness: 0.6
 		});
 		tag.colorNode = color(0xc8f25a);
-		tag.opacityNode = texture(assets.graffiti).a.mul(0.5);
+		// The PNG carries a faint haze (alpha <= 21/255) over the whole square; cut it so only paint shows.
+		tag.opacityNode = smoothstep(0.1, 0.25, texture(assets.graffiti).a).mul(0.5);
 		const decal = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), tag);
 		decal.rotation.x = -Math.PI / 2;
 		decal.position.set(0.2, 0.01, 11);
