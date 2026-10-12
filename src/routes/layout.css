@@ -2,6 +2,7 @@
 @plugin '@tailwindcss/forms';
 
 :root {
+	font-size: clamp(16px, 1.2vw, 20px);
 	font-family: 'Avenir Next', 'Segoe UI', sans-serif;
 	color: #f3f3e8;
 	background: #101c28;

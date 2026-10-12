@@ -78,12 +78,14 @@
 			app?.dispose();
 		};
 	});
+
 	$effect(() => {
 		if (ready) {
 			app?.setSettings(settings);
 			saveSettings(settings);
 		}
 	});
+
 	$effect(() => {
 		if (phase === 'results' && run && completedId !== run.id && $gameStateStore.result) {
 			completedId = run.id;
@@ -103,6 +105,7 @@
 			if (party.length) partyScores = [...partyScores, entry];
 		}
 	});
+
 	$effect(() => {
 		if (phase === 'results' || phase === 'paused' || panel !== 'home') {
 			void tick().then(() => focusPanel?.focus({ preventScroll: true }));
@@ -115,12 +118,14 @@
 		run = { id: crypto.randomUUID(), name: playerName(currentName) };
 		app?.start();
 	}
+
 	function solo() {
 		party = [];
 		partyScores = [];
 		name = playerName(name);
 		startRound();
 	}
+
 	function startParty() {
 		const names = partyNames
 			.split('\n')
@@ -138,16 +143,19 @@
 		panel = 'home';
 		startRound();
 	}
+
 	function nextTurn() {
 		partyIndex++;
 		startRound();
 	}
+
 	function mainMenu() {
 		app?.menu();
 		panel = 'home';
 		run = null;
 		entry = null;
 	}
+
 	async function share() {
 		if (!entry) return;
 		try {
@@ -160,6 +168,7 @@
 				shareMessage = 'Sharing failed. Try copying the game link.';
 		}
 	}
+
 	async function copyLink() {
 		try {
 			await navigator.clipboard.writeText(location.origin);
@@ -171,12 +180,13 @@
 </script>
 
 <svelte:head>
-	<title>Aim Low — Low aim. High scores.</title>
+	<title>Aim Low - Low aim. High scores.</title>
 	<meta
 		name="description"
 		content="Keep it in the bowl. Blast the bugs. Don’t run dry. A ridiculous, free arcade party game."
 	/>
 	<meta name="theme-color" content="#101c28" />
+
 	<!-- Start downloads with the HTML, not after the engine bundle boots. Matches loader requests. -->
 	{#each assetsToLoad as asset (asset.id)}
 		<link
@@ -191,6 +201,7 @@
 <main
 	class:reduced-motion={settings.reducedMotion}
 	class:in-game={phase === 'playing' || phase === 'countdown'}
+	class:menu-home={phase === 'menu' && panel === 'home'}
 >
 	<canvas
 		class="threejs"
@@ -198,48 +209,50 @@
 		bind:this={canvas}
 		aria-label="Aim Low game arena. Move your pointer, drag, or use arrow keys to aim."
 	></canvas>
+
 	{#if !ready}
 		<div class="screen loading-screen">
 			<span class="brand">↙ AIM LOW.</span>
-			{#if error}<h1>TECHNICAL<br />DIFFICULTIES.</h1>
+			{#if error}
+				<h1>TECHNICAL<br />DIFFICULTIES.</h1>
 				<p role="alert">{error}</p>
 				<button class="primary" onclick={() => location.reload()}>TRY AGAIN ↗</button>
-			{:else}<span class="eyebrow">GETTING THE PLUMBING READY</span>
+			{:else}
+				<span class="eyebrow">GETTING THE PLUMBING READY</span>
 				<div class="loading-track"><div style:width="{progress}%"></div></div>
 				<p role="status">Loading the bathroom… {progress}%</p>{/if}
 		</div>
 	{:else if phase === 'menu'}
 		<div class="menu-shade"></div>
 		<header class="site-header">
-			<a
-				class="brand"
-				href={resolve('/')}
-				onclick={(e) => {
-					e.preventDefault();
-					panel = 'home';
-				}}>↙ AIM LOW<span>.</span></a
-			><span class="edition">BATHROOM ARCADE <b>VOL. 01</b></span>
+			<span class="edition">BATHROOM ARCADE <b>VOL. 01</b></span>
 		</header>
+
 		{#if panel === 'home'}
 			<section class="home">
-				<div class="tag"><span></span> NOT YOUR AVERAGE AIM TRAINER</div>
 				<h1>
-					AIM<br /><span>LOW.</span><svg viewBox="0 0 64 64" aria-hidden="true"
-						><path d="M54 10 10 54M10 20v34h34" /></svg
-					>
+					AIM
+					<br />
+					<span>LOW.</span>
+					<svg viewBox="0 0 64 64" aria-hidden="true">
+						<path d="M54 10 10 54M10 20v34h34" />
+					</svg>
 				</h1>
 				<p class="tagline">Low aim. <b>High scores.</b></p>
 				<p class="intro">
 					Keep it in the bowl. Blast the bugs.<br />Don’t run dry. Your dignity is optional.
 				</p>
-				<label class="player-field"
-					><span class="eyebrow">YOUR ARCADE NAME</span><input
+
+				<label class="player-field">
+					<span class="eyebrow">YOUR ARCADE NAME</span>
+					<input
 						maxlength="12"
 						bind:value={name}
 						aria-label="Your arcade name"
 						autocomplete="nickname"
-					/></label
-				>
+					/>
+				</label>
+
 				<button class="primary play" onclick={solo}>LET IT FLOW <span>↗</span></button>
 				<div class="menu-actions">
 					<button class="secondary" onclick={() => (panel = 'party')}
@@ -493,6 +506,16 @@
 		inset: 0;
 		isolation: isolate;
 	}
+	.menu-home {
+		display: grid;
+		grid-template-rows: auto minmax(0, 1fr) auto;
+		row-gap: 1rem;
+		padding: 1.8rem 3.5rem 0.8rem;
+	}
+	.menu-home .threejs {
+		position: absolute;
+		inset: 0;
+	}
 	.threejs {
 		width: 100%;
 		height: 100%;
@@ -518,13 +541,15 @@
 		align-items: center;
 		justify-content: space-between;
 	}
+	.menu-home .site-header {
+		position: relative;
+		inset: auto;
+		padding: 0;
+	}
 	.brand {
 		text-decoration: none;
 		font: 900 1.3rem var(--display);
 		letter-spacing: -0.05em;
-	}
-	.brand span {
-		color: var(--lime);
 	}
 	.edition {
 		font: 0.6rem var(--mono);
@@ -542,26 +567,10 @@
 		color: var(--paper);
 	}
 	.home {
-		position: absolute;
-		top: 50%;
-		left: 7%;
-		transform: translateY(-48%);
-		width: min(370px, 39vw);
-	}
-	.tag {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		font: 600 0.55rem var(--mono);
-		letter-spacing: 0.09em;
-		color: var(--mint);
-	}
-	.tag > span {
-		width: 6px;
-		height: 6px;
-		background: var(--mint);
-		border-radius: 50%;
-		box-shadow: 0 0 12px #8ae8d266;
+		position: relative;
+		align-self: center;
+		margin-left: max(0px, calc(7vw - 3.5rem));
+		width: min(430px, 42vw);
 	}
 	h1 {
 		font: 1000 clamp(5rem, 10vw, 9rem)/0.82 var(--display);
@@ -593,7 +602,7 @@
 	}
 	.intro {
 		color: var(--muted);
-		font-size: 0.8rem;
+		font-size: 1rem;
 		line-height: 1.65;
 		margin: 0.8rem 0 1.15rem;
 	}
@@ -604,12 +613,12 @@
 		margin: 0.5rem 0 0.75rem;
 	}
 	.player-field .eyebrow {
-		font-size: 0.53rem;
+		font-size: 0.8rem;
 		white-space: nowrap;
 	}
 	.player-field input {
 		padding: 0.45rem 0.65rem;
-		font: 700 0.7rem var(--mono);
+		font: 700 0.8rem var(--mono);
 		min-width: 0;
 	}
 	.play {
@@ -620,7 +629,7 @@
 		min-height: 57px;
 	}
 	.play > span {
-		font-size: 1.5rem;
+		font-size: 1.8rem;
 		line-height: 1;
 	}
 	.menu-actions {
@@ -639,18 +648,24 @@
 		font: 0.6rem var(--mono);
 	}
 	.minor-actions {
-		display: flex;
+		display: grid;
+		grid-template-columns: 1fr auto 1fr;
 		align-items: center;
-		justify-content: center;
-		gap: 1rem;
-		margin-top: 0.4rem;
+		gap: 0.8rem;
+		margin-top: 0.85rem;
+	}
+	.minor-actions button:first-child {
+		justify-self: end;
+	}
+	.minor-actions button:last-child {
+		justify-self: start;
 	}
 	.minor-actions > span {
 		color: #ffffff30;
 		font-size: 0.7rem;
 	}
 	.minor-actions button {
-		font-size: 0.6rem;
+		font-size: 0.75rem;
 	}
 	.arena-note {
 		position: absolute;
@@ -659,7 +674,7 @@
 		transform: rotate(7deg);
 	}
 	.arena-note p {
-		font: 600 0.8rem/1.4 var(--mono);
+		font: 600 1rem/1.4 var(--mono);
 		margin: 0 0 0.4rem;
 	}
 	.arena-note b {
@@ -668,23 +683,20 @@
 	.note-arrow {
 		display: block;
 		color: var(--mint);
-		font-size: 3rem;
+		font-size: 4rem;
 		transform: rotate(-15deg);
 	}
 	.arena-note .eyebrow {
-		font-size: 0.45rem;
+		font-size: 0.8rem;
 	}
 	.home-footer {
-		position: absolute;
-		bottom: 1.8rem;
-		left: 3.5rem;
-		right: 3.5rem;
+		position: relative;
 		display: flex;
 		align-items: center;
 		gap: 1.75rem;
 		border-top: 1px solid var(--line);
-		padding-top: 1.25rem;
-		font: 600 0.55rem var(--mono);
+		padding-top: 0.5rem;
+		font: 600 0.75rem var(--mono);
 		letter-spacing: 0.05em;
 	}
 	.home-footer i {
@@ -694,7 +706,7 @@
 	}
 	.home-footer small {
 		margin-left: auto;
-		font-size: 0.5rem;
+		font-size: 0.65rem;
 		color: var(--muted);
 	}
 	.modal-wrap {
@@ -963,20 +975,19 @@
 		transition: width 0.3s;
 	}
 	@media (max-width: 800px) {
+		.menu-home,
 		.site-header {
 			padding: 1.25rem 1.5rem;
 		}
 		.home {
-			left: 6%;
-			width: min(340px, 48vw);
+			margin-left: max(0px, calc(6vw - 1.5rem));
+			width: min(370px, 48vw);
 		}
 		.arena-note {
 			right: 5%;
 			font-size: 0.6rem;
 		}
 		.home-footer {
-			left: 1.5rem;
-			right: 1.5rem;
 			gap: 1rem;
 		}
 		.home-footer small {
@@ -997,9 +1008,8 @@
 			display: none;
 		}
 		.home {
-			width: min(340px, calc(100% - 3rem));
-			left: 50%;
-			transform: translate(-50%, -48%);
+			width: min(370px, 100%);
+			margin: 0 auto;
 		}
 		h1 {
 			font-size: clamp(5rem, 19vw, 7.5rem);
@@ -1010,8 +1020,7 @@
 		}
 		.home-footer {
 			justify-content: space-between;
-			font-size: 0.43rem;
-			bottom: 1rem;
+			font-size: 0.7rem;
 			gap: 0.25rem;
 		}
 		.panel {
@@ -1028,28 +1037,36 @@
 		}
 	}
 	@media (max-height: 740px) {
-		.home {
-			transform: translateY(-47%) scale(0.88);
-			transform-origin: left center;
+		.home h1 {
+			font-size: clamp(4rem, 9vw, 7rem);
+			margin: 0.7rem 0;
 		}
 		.intro {
-			margin: 0.5rem 0 0.7rem;
+			line-height: 1.4;
+			margin: 0.4rem 0 0.6rem;
+		}
+		.menu-actions {
+			margin-top: 0.4rem;
+		}
+		.minor-actions button {
+			min-height: 32px;
 		}
 		.home-footer {
-			bottom: 1rem;
-			padding-top: 0.75rem;
+			padding-top: 0.35rem;
 		}
 	}
 	@media (max-height: 740px) and (max-width: 600px) {
-		.home {
-			transform: translate(-50%, -47%) scale(0.88);
-			transform-origin: center;
+		.home h1 {
+			font-size: clamp(4rem, 16vw, 6rem);
+		}
+	}
+	@media (max-width: 380px) {
+		.home-footer {
+			font-size: 0.62rem;
 		}
 	}
 	@media (max-height: 520px) {
 		.home {
-			top: 85px;
-			transform: none;
 			width: min(600px, 90vw);
 			display: grid;
 			grid-template-columns: 1fr 1fr;
@@ -1061,7 +1078,6 @@
 			font-size: 5.5rem;
 			margin: 0.5rem 0;
 		}
-		.tag,
 		.intro,
 		.tagline,
 		.arena-note,
@@ -1077,6 +1093,25 @@
 		}
 		.menu-actions {
 			margin-top: 0.5rem;
+		}
+	}
+	@media (max-height: 520px) and (max-width: 600px) {
+		.home {
+			display: block;
+			width: 100%;
+		}
+		.home h1 {
+			font-size: clamp(3.5rem, 13vh, 5rem);
+			margin: 0.3rem 0;
+		}
+		.player-field {
+			margin: 0.3rem 0;
+		}
+		.play {
+			min-height: 48px;
+		}
+		.menu-actions {
+			margin-top: 0.35rem;
 		}
 	}
 </style>
