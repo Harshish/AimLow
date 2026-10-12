@@ -12,6 +12,7 @@ import {
 	SPILL_PENALTY_PER_FLOW,
 	QUICK_KILL_WINDOW,
 	killReward,
+	multiplier,
 	UNLOCK_WAVE,
 	type BugKind,
 	type DrinkKind
@@ -40,6 +41,8 @@ export type GameState = {
 	wave: number;
 	waveRemaining: number;
 	bowlStreak: number;
+	/** Kills in a row without an escape; drives the score multiplier. */
+	combo: number;
 	fastestKill: number | null;
 	drink: { kind: DrinkKind; remaining: number } | null;
 	notice: Notice | null;
@@ -60,6 +63,7 @@ export function initialState(): GameState {
 		wave: 0,
 		waveRemaining: 0,
 		bowlStreak: 0,
+		combo: 0,
 		fastestKill: null,
 		drink: null,
 		notice: null,
@@ -131,7 +135,9 @@ export default class Session {
 		this.state.targeted += targeted;
 		this.state.score = Math.max(
 			0,
-			this.state.score + captured * SCORE_PER_FLOW - spilled * SPILL_PENALTY_PER_FLOW
+			this.state.score +
+				captured * SCORE_PER_FLOW * multiplier(this.state.combo) -
+				spilled * SPILL_PENALTY_PER_FLOW
 		);
 		if (this.state.drink || spilled > 0 || targeted > 0) {
 			this.resetStreak();
@@ -180,15 +186,17 @@ export default class Session {
 	/** `reaction` is seconds since the bug appeared; faster bugs and reactions pay more. */
 	kill(kind: BugKind, speed = 1, reaction = QUICK_KILL_WINDOW) {
 		if (!this.playing) return 0;
-		const points = killReward(kind, speed, reaction);
+		const combo = multiplier(this.state.combo);
+		const points = Math.round(killReward(kind, speed, reaction) * combo);
 		const quick = reaction <= QUICK_KILL_WINDOW / 2;
 		this.state.kills++;
+		this.state.combo++;
 		this.state.waveRemaining = Math.max(0, this.state.waveRemaining - 1);
 		this.state.score += points;
 		this.state.fastestKill = Math.min(this.state.fastestKill ?? Infinity, reaction);
 		this.state.pressure = Math.min(100, this.state.pressure + KILL_PRESSURE_GAIN);
 		this.announce(
-			`+${points} · ${reaction.toFixed(2)}s ${quick ? 'QUICK KILL!' : kind === 'wasp' ? 'BUZZ OFF!' : 'EIGHT LEGS. ZERO CHANCE.'} · +${KILL_PRESSURE_GAIN}% PRESSURE`,
+			`+${points}${combo > 1 ? ` ×${combo}` : ''} · ${reaction.toFixed(2)}s ${quick ? 'QUICK KILL!' : kind === 'wasp' ? 'BUZZ OFF!' : 'EIGHT LEGS. ZERO CHANCE.'} · +${KILL_PRESSURE_GAIN}% PRESSURE`,
 			quick ? 'quick' : 'good'
 		);
 		return points;
@@ -197,7 +205,9 @@ export default class Session {
 		if (!this.playing) return;
 		this.state.missed++;
 		this.state.waveRemaining = Math.max(0, this.state.waveRemaining - 1);
-		this.announce(`−${BUGS[kind].penalty}% · ${kind.toUpperCase()} GOT AWAY`, 'bad');
+		const broken = this.state.combo > 1 ? ' · COMBO BROKEN' : '';
+		this.state.combo = 0;
+		this.announce(`−${BUGS[kind].penalty}% · ${kind.toUpperCase()} GOT AWAY${broken}`, 'bad');
 		this.losePressure(BUGS[kind].penalty);
 	}
 	private awardPowerup() {

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { GameState } from '$lib/Game/Session';
-	import { DRINKS, BOWL_STREAK_SECONDS } from '$lib/Game/config';
+	import { DRINKS, BOWL_STREAK_SECONDS, multiplier } from '$lib/Game/config';
 	let {
 		state,
 		name,
@@ -16,6 +16,9 @@
 				>{Math.floor(state.score).toLocaleString().padStart(4, '0')}</strong
 			><small>BEST {best.toLocaleString()}</small>
 		</div>
+		{#if state.combo > 0}
+			{#key state.combo}<span class="combo">×{multiplier(state.combo)} COMBO</span>{/key}
+		{/if}
 		<span class="wave-status"
 			>{state.wave === 0 ? 'GET READY!' : `WAVE ${state.wave}`}<small
 				>{state.waveRemaining > 0
@@ -130,6 +133,27 @@
 		font: 700 0.6rem var(--mono);
 		letter-spacing: 0.1em;
 		color: #5c4a00;
+	}
+	.combo {
+		padding: 0.2rem 0.55rem;
+		background: var(--lime);
+		color: var(--outline);
+		border: 2px solid var(--outline);
+		box-shadow: 3px 3px 0 var(--outline);
+		font: 1.1rem var(--display);
+		letter-spacing: 0.06em;
+		rotate: -2deg;
+		animation: combo-pop 0.25s ease-out;
+	}
+	@keyframes combo-pop {
+		from {
+			scale: 1.35;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.combo {
+			animation: none;
+		}
 	}
 	.wave-status {
 		padding: 0.25rem 0.55rem;

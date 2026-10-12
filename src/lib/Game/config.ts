@@ -1,4 +1,4 @@
-export const RULES_VERSION = 'arcade-9';
+export const RULES_VERSION = 'arcade-10';
 export const STEP = 1 / 60;
 export const FLOW_RATE = 150;
 export const PARTICLE_LIFE = 3;
@@ -111,6 +111,12 @@ export function waveProfile(wave: number) {
 export function killReward(kind: BugKind, speed = 1, reaction = QUICK_KILL_WINDOW) {
 	const quick = Math.max(0, 1 - reaction / QUICK_KILL_WINDOW);
 	return Math.round(BUGS[kind].reward * speed * (1 + quick));
+}
+// Each kill in a row (no escapes) adds +0.25x to kill and bowl points, capped at 3x after 8.
+export const COMBO_STEP = 0.25;
+export const MAX_MULTIPLIER = 3;
+export function multiplier(combo: number) {
+	return Math.min(MAX_MULTIPLIER, 1 + combo * COMBO_STEP);
 }
 export const MAX_KILL_REWARD = Math.max(
 	...Object.keys(BUGS).map((kind) => killReward(kind as BugKind, BUG_SPEEDS.fast[1], 0))

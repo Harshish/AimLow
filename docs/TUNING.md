@@ -10,7 +10,7 @@ These values were set without a browser pass. Tune them while watching the game.
 - [ ] **God rays:** visible as a diagonal beam. The beam doesn't draw over the urinal's front, and the dust doesn't look blocky or banded.
 - [ ] **Frame rate:** steady 60 fps on High on a laptop. Phones default to Low; check that Low is smooth.
 - [ ] **Floor tag:** readable in front of the bowl and not hidden by the bottom HUD.
-- [ ] **Hiss:** the stream hiss isn't annoying over a full run.
+- [ ] **Stream rush:** sounds like water, pleasant over a full run, never gross.
 
 ## Symptom → knob
 
@@ -71,18 +71,21 @@ These values were set without a browser pass. Tune them while watching the game.
 
 ## Reactive feedback
 
-| Knob               | Where                                              | Now                                                       | Notes                                                                     |
-| ------------------ | -------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------- |
-| Hit pulse          | `this.hitPulse = 0.12` in `src/lib/World/World.ts` | 0.12 s                                                    | Reticle flash and growth while the stream hits a bug.                     |
-| Lock-on size       | `locked ? 0.35 : 0`                                | +35%                                                      | Reticle growth while hovering over a bug.                                 |
-| Ring charge glow   | `1.2 + charge * 2.8`                               | Up to 4×                                                  | Bowl ring brightness as the streak charges.                               |
-| Escape alarm       | `this.alarm = 0.6`                                 | 0.6 s                                                     | How long the red flash on the lane lights lasts.                          |
-| Power-up tint      | `lerp(…, 0.45)`                                    | 45%                                                       | How far the lane lights shift toward the drink color.                     |
-| Shake decay / size | `dt * 2.2`, `** 2 * 0.55` in `src/lib/Camera.ts`   | 2.2 /s, 0.55                                              | Faster decay = shorter shakes.                                            |
-| Shake per event    | `camera.shake(…)` in `src/lib/App.ts`              | Kill 0.28, escape 0.55                                    | Shakes stack and are capped at 1.                                         |
-| Haptics            | `haptic(…)` in `src/lib/App.ts`                    | Kill 14 ms, escape `[35,40,35]`, drink `[15,30,15,30,40]` | Vibration in milliseconds. Phones only, and the player can switch it off. |
-| Stream hiss        | `0.022` and `2600` in `src/lib/Game/Audio.ts`      | Gain 0.022, 2.6 kHz                                       | Volume and pitch of the hiss.                                             |
-| Kill splat         | `setValueAtTime(0.16, now)` in `splat()`           | 0.16                                                      | Splat volume.                                                             |
+| Knob                        | Where                                              | Now                                                                   | Notes                                                                                                                                        |
+| --------------------------- | -------------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hit pulse                   | `this.hitPulse = 0.12` in `src/lib/World/World.ts` | 0.12 s                                                                | Reticle flash and growth while the stream hits a bug.                                                                                        |
+| Lock-on size                | `locked ? 0.35 : 0`                                | +35%                                                                  | Reticle growth while hovering over a bug.                                                                                                    |
+| Ring charge glow            | `1.2 + charge * 2.8`                               | Up to 4×                                                              | Bowl ring brightness as the streak charges.                                                                                                  |
+| Escape alarm                | `this.alarm = 0.6`                                 | 0.6 s                                                                 | How long the red flash on the lane lights lasts.                                                                                             |
+| Power-up tint               | `lerp(…, 0.45)`                                    | 45%                                                                   | How far the lane lights shift toward the drink color.                                                                                        |
+| Shake decay / size          | `dt * 2.2`, `** 2 * 0.55` in `src/lib/Camera.ts`   | 2.2 /s, 0.55                                                          | Faster decay = shorter shakes.                                                                                                               |
+| Shake per event             | `camera.shake(…)` in `src/lib/App.ts`              | Kill 0.28, escape 0.55                                                | Shakes stack and are capped at 1.                                                                                                            |
+| Haptics                     | `haptic(…)` in `src/lib/App.ts`                    | Kill 14 ms, escape `[35,40,35]`, drink `[15,30,15,30,40]`             | Vibration in milliseconds. Phones only, and the player can switch it off.                                                                    |
+| Stream rush                 | `VOICES` in `src/lib/Game/Audio.ts`                | Low-pass: bowl 1.2 kHz / 0.006, bug 1.3 kHz, spill 0.7 kHz, air 1 kHz | Warm fountain-like rush. Higher cutoff = brighter/hissier; keep under ~2.5 kHz to avoid the urinal tinkle. Swirl: `0.35` Hz, depth `180` Hz. |
+| Bowl chord                  | `CHORD`, `CHORD_GAIN` in `Audio.ts`                | C4–G5 chord, Q 90, gain 0.06 → 0.22 with streak charge                | Ringing glass tone. Higher `Q` = purer tone, lower = more water. Full during a drink.                                                        |
+| Bowl melody                 | `MELODY` in `Audio.ts`                             | Sine every 0.32 s → 0.18 s, gain 0.006 → 0.012                        | Soft line wandering the pentatonic `SCALE`; speeds up and swells with streak charge.                                                         |
+| Streak chimes / combo pling | `SCALE`, `chime()`, `splat()` in `Audio.ts`        | C5 pentatonic, gain 0.03 / 0.035                                      | Rising notes per 0.5 s of clean streak and per kill in a chain.                                                                              |
+| Kill splat                  | `setValueAtTime(0.16, now)` in `splat()`           | 0.16                                                                  | Splat volume.                                                                                                                                |
 
 ## Quality tiers
 
@@ -100,5 +103,6 @@ Balance lives in `src/lib/Game/config.ts`. The values set in the pacing pass:
 - `MIN_SPAWN_INTERVAL` and the spawn-interval ramp
 - `WAVE_BREAK`
 - `BOWL_STREAK_SECONDS`
+- `COMBO_STEP` and `MAX_MULTIPLIER` (kill chain: +0.25× per kill, 3× cap; an escape resets it)
 
 Changing them changes scores, so bump `RULES_VERSION` afterwards.

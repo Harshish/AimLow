@@ -37,6 +37,8 @@ import {
 	QUICK_KILL_WINDOW,
 	MAX_KILL_REWARD,
 	killReward,
+	multiplier,
+	MAX_MULTIPLIER,
 	type DrinkKind
 } from '../src/lib/Game/config';
 import {
@@ -250,6 +252,25 @@ test('round rules freeze, drain consistently, and finalize exactly once', () => 
 		assert.equal(session.state.pressure, 100);
 		assert.equal(session.state.result, null);
 	}
+});
+
+test('kill chains multiply kills and bowl points until a bug escapes', () => {
+	const session = new Session();
+	session.start();
+	session.tick(3);
+	assert.equal(session.kill('spider'), BUGS.spider.reward, 'first kill is unmultiplied');
+	assert.equal(session.kill('spider'), Math.round(BUGS.spider.reward * multiplier(1)));
+	session.flow(1, 0);
+	const bowl = session.state.score;
+	session.flow(1, 0);
+	assert.equal(session.state.score - bowl, 100 * multiplier(2), 'the chain boosts bowl points');
+	session.flow(0, 1);
+	assert.equal(session.state.combo, 2, 'spills cost points but keep the chain');
+	session.miss('wasp');
+	assert.equal(session.state.combo, 0);
+	assert.match(session.state.notice!.text, /COMBO BROKEN/);
+	assert.equal(session.kill('spider'), BUGS.spider.reward);
+	assert.equal(multiplier(1000), MAX_MULTIPLIER);
 });
 
 test('combat hits count toward accuracy without double-awarding score', () => {
@@ -1177,7 +1198,7 @@ test('enemies clone independently, reward final-tick kills once, and penalize ti
 			beforeKill + KILL_PRESSURE_GAIN,
 			'kill refills exactly once'
 		);
-		wasp.age = wasp.deadline + 0.3;
+		wasp.age = wasp.deadline + 0.3 + 1e-6; // past roundoff in clock * speed
 		const pressure = session.state.pressure;
 		manager.resolveDeadlines();
 		manager.resolveDeadlines();

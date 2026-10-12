@@ -10,7 +10,7 @@ import InputController from './UI/InputController';
 import { gameStateStore } from './Utils/Store';
 import Session from './Game/Session';
 import Audio from './Game/Audio';
-import { DEFAULT_SETTINGS, type Settings } from './Game/config';
+import { BOWL_STREAK_SECONDS, DEFAULT_SETTINGS, type Settings } from './Game/config';
 
 /** Composition root. Simulation owns rules; Svelte receives snapshots, never engine services. */
 export default class App {
@@ -31,6 +31,7 @@ export default class App {
 	private lastNotice = 0;
 	private lastKills = 0;
 	private lastMissed = 0;
+	private lastChime = 0;
 	private publishedAt = 0;
 	private lastPhase = this.session.state.phase;
 
@@ -68,7 +69,13 @@ export default class App {
 				this.publish();
 				this.lastPhase = phase;
 			}
-			this.audio.update(phase, this.session.state.pressure > 0);
+			const { pressure, drink, bowlStreak } = this.session.state;
+			this.audio.update(
+				phase,
+				pressure > 0,
+				this.world?.landing,
+				drink ? 1 : bowlStreak / BOWL_STREAK_SECONDS
+			);
 			this.publishedAt += dt;
 			// Only the HUD needs a steady feed; other screens change on phase transitions.
 			if ((phase === 'playing' || phase === 'countdown') && this.publishedAt >= 1 / 30) {
@@ -158,10 +165,14 @@ export default class App {
 	}
 	/** Kill and escape impacts: screen shake, a wet splat, and a buzz on phones. */
 	private feedback() {
-		const { kills, missed } = this.session.state;
+		const { kills, missed, combo, bowlStreak } = this.session.state;
+		// Clean-streak charge rings a rising note every half second.
+		const chime = Math.floor(bowlStreak / 0.5);
+		if (chime > this.lastChime) this.audio.chime(chime);
+		this.lastChime = chime;
 		if (kills > this.lastKills) {
 			this.camera.shake(0.28);
-			this.audio.splat();
+			this.audio.splat(combo - 1);
 			this.haptic(14);
 		}
 		if (missed > this.lastMissed) {

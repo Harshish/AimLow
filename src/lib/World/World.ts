@@ -24,6 +24,9 @@ export default class World {
 	private hitPulse = 0;
 	private alarm = 0;
 	private lastMissed = 0;
+	/** Recent flow per surface, decayed each step, so the stream sound follows where it lands. */
+	private readonly recent = { bowl: 0, spill: 0, bug: 0 };
+	landing: 'bowl' | 'spill' | 'bug' | null = null;
 	private readonly tint = new THREE.Color();
 	private readonly reticle = new THREE.Mesh(
 		new THREE.RingGeometry(0.12, 0.155, 24),
@@ -84,6 +87,7 @@ export default class World {
 					(target) => target.kind === 'enemy' && this.enemies.hit(target.id)
 				);
 				if (flow.targeted > 0) this.hitPulse = 0.12;
+				this.listen(flow.captured, flow.spilled, flow.targeted);
 				this.session.flow(flow.captured, flow.spilled, flow.targeted, STEP);
 				this.enemies.resolveDeadlines();
 				this.session.tick(STEP);
@@ -105,6 +109,16 @@ export default class World {
 		this.waterJet.syncInstances((alpha - 1) * STEP);
 		this.reticle.position.copy(this.input.aim);
 		this.reticle.quaternion.copy(this.camera.quaternion);
+	}
+	private listen(bowl: number, spill: number, bug: number) {
+		const r = this.recent;
+		// ~0.1 s half-life at 60 Hz; full flow on one surface settles near 1/6.
+		r.bowl = r.bowl * 0.9 + bowl;
+		r.spill = r.spill * 0.9 + spill;
+		r.bug = r.bug * 0.9 + bug;
+		const loudest = Math.max(r.bowl, r.spill, r.bug);
+		this.landing =
+			loudest < 0.03 ? null : loudest === r.bowl ? 'bowl' : loudest === r.bug ? 'bug' : 'spill';
 	}
 	/** Presentation that answers the rules: lock-on, hit pulse, streak charge, and light cues. */
 	private react(delta: number, reducedMotion: boolean) {
@@ -156,6 +170,8 @@ export default class World {
 		this.effects.reset();
 		this.accumulator = 0;
 		this.hitPulse = this.alarm = this.lastMissed = 0;
+		this.recent.bowl = this.recent.spill = this.recent.bug = 0;
+		this.landing = null;
 		this.reticle.visible = false;
 	}
 	dispose() {
