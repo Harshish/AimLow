@@ -26,6 +26,19 @@
 			></span
 		>
 	</div>
+	<!-- Call-outs live in the HUD's empty top-centre gap, clear of the bowl and bug lanes. -->
+	<div class="notice-slot">
+		{#if state.notice}
+			{#key state.notice.id}<div
+					class="notice"
+					class:bad={state.notice.tone === 'bad'}
+					class:quick={state.notice.tone === 'quick'}
+					role="status"
+				>
+					{state.notice.text}
+				</div>{/key}
+		{/if}
+	</div>
 	<div class="pressure comic-panel" class:low={state.pressure <= 20}>
 		<div class="pressure-label">
 			<span class="eyebrow">{state.pressure <= 20 ? '⚠ RUNNING ON EMPTY' : 'TANK PRESSURE'}</span><b
@@ -77,16 +90,6 @@
 		</div>{/if}
 	<div class="kill-count"><b>{state.kills}</b> BUGS BLASTED</div>
 </div>
-{#if state.notice}
-	{#key state.notice.id}<div
-			class="notice"
-			class:bad={state.notice.tone === 'bad'}
-			class:quick={state.notice.tone === 'quick'}
-			role="status"
-		>
-			{state.notice.text}
-		</div>{/key}
-{/if}
 
 <style>
 	.hud {
@@ -282,11 +285,14 @@
 		font: 700 0.6rem/1.4 var(--mono);
 	}
 	/* Burst-style call-out: inked box, comic lettering, a quick pop. */
+	.notice-slot {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		justify-content: center;
+		padding-top: 0.4rem;
+	}
 	.notice {
-		position: absolute;
-		top: 24%;
-		left: 50%;
-		pointer-events: none;
 		padding: 0.5rem 1.1rem;
 		border: 3px solid var(--outline);
 		box-shadow: 5px 5px 0 var(--outline);
@@ -295,7 +301,6 @@
 		font: 1.4rem var(--display);
 		letter-spacing: 0.06em;
 		text-align: center;
-		translate: -50% 0;
 		rotate: -3deg;
 		animation: announce 1.8s both;
 	}
@@ -391,9 +396,15 @@
 		.kill-count b {
 			font-size: 1.8rem;
 		}
+		/* No room between the panels on phones: hang the call-out just under the HUD row. */
+		.notice-slot {
+			position: absolute;
+			top: 100%;
+			left: 0.9rem;
+			right: 0.9rem;
+			padding-top: 0;
+		}
 		.notice {
-			width: max-content;
-			max-width: 85vw;
 			font-size: 1.1rem;
 		}
 	}
@@ -412,7 +423,6 @@
 			display: none;
 		}
 		.notice {
-			top: 36%;
 			font-size: 1.1rem;
 		}
 		.game-bottom {
