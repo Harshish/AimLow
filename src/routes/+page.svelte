@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
-	import { resolve } from '$app/paths';
 	import App from '$lib/App';
 	import { gameStateStore } from '$lib/Utils/Store';
 	import {
@@ -186,6 +185,13 @@
 		content="Keep it in the bowl. Blast the bugs. Don’t run dry. A ridiculous, free arcade party game."
 	/>
 	<meta name="theme-color" content="#101c28" />
+	<link
+		rel="preload"
+		href="/fonts/bangers-latin.woff2"
+		as="font"
+		type="font/woff2"
+		crossorigin="anonymous"
+	/>
 
 	<!-- Start downloads with the HTML, not after the engine bundle boots. Matches loader requests. -->
 	{#each assetsToLoad as asset (asset.id)}
@@ -212,9 +218,9 @@
 
 	{#if !ready}
 		<div class="screen loading-screen">
-			<span class="brand">↙ AIM LOW.</span>
+			<span class="brand lettering">AIM LOW.</span>
 			{#if error}
-				<h1>TECHNICAL<br />DIFFICULTIES.</h1>
+				<h1 class="lettering">TECHNICAL<br />DIFFICULTIES.</h1>
 				<p role="alert">{error}</p>
 				<button class="primary" onclick={() => location.reload()}>TRY AGAIN ↗</button>
 			{:else}
@@ -225,12 +231,12 @@
 	{:else if phase === 'menu'}
 		<div class="menu-shade"></div>
 		<header class="site-header">
-			<span class="edition">BATHROOM ARCADE <b>VOL. 01</b></span>
+			<span class="edition">BATHROOM ARCADE <b class="caption">VOL. 01</b></span>
 		</header>
 
 		{#if panel === 'home'}
 			<section class="home">
-				<h1>
+				<h1 class="lettering">
 					AIM
 					<br />
 					<span>LOW.</span>
@@ -238,36 +244,38 @@
 						<path d="M54 10 10 54M10 20v34h34" />
 					</svg>
 				</h1>
-				<p class="tagline">Low aim. <b>High scores.</b></p>
-				<p class="intro">
-					Keep it in the bowl. Blast the bugs.<br />Don’t run dry. Your dignity is optional.
-				</p>
+				<p class="tagline caption">LOW AIM. <b>HIGH SCORES.</b></p>
+				<div class="home-card comic-panel">
+					<p class="intro">
+						Keep it in the bowl. Blast the bugs.<br />Don’t run dry. Your dignity is optional.
+					</p>
 
-				<label class="player-field">
-					<span class="eyebrow">YOUR ARCADE NAME</span>
-					<input
-						maxlength="12"
-						bind:value={name}
-						aria-label="Your arcade name"
-						autocomplete="nickname"
-					/>
-				</label>
+					<label class="player-field">
+						<span class="eyebrow">YOUR ARCADE NAME</span>
+						<input
+							maxlength="12"
+							bind:value={name}
+							aria-label="Your arcade name"
+							autocomplete="nickname"
+						/>
+					</label>
 
-				<button class="primary play" onclick={solo}>LET IT FLOW <span>↗</span></button>
-				<div class="menu-actions">
-					<button class="secondary" onclick={() => (panel = 'party')}
-						>PARTY PLAY <span>2–8</span></button
-					><button class="secondary" onclick={() => (panel = 'board')}>HIGH SCORES ↗</button>
-				</div>
-				<div class="minor-actions">
-					<button class="text-button" onclick={() => (panel = 'help')}>HOW TO PLAY</button><span>
-						/
-					</span><button class="text-button" onclick={() => (panel = 'settings')}>SETTINGS</button>
+					<button class="primary play" onclick={solo}>LET IT FLOW <span>↗</span></button>
+					<div class="menu-actions">
+						<button class="secondary" onclick={() => (panel = 'party')}
+							>PARTY PLAY <span>2–8</span></button
+						><button class="secondary" onclick={() => (panel = 'board')}>HIGH SCORES ↗</button>
+					</div>
+					<div class="minor-actions">
+						<button class="text-button" onclick={() => (panel = 'help')}>HOW TO PLAY</button><span>
+							/
+						</span><button class="text-button" onclick={() => (panel = 'settings')}>SETTINGS</button
+						>
+					</div>
 				</div>
 			</section>
-			<div class="arena-note">
-				<span class="note-arrow">↙</span>
-				<p>THE ORIGINAL<br /><b>SPLASH ZONE.</b></p>
+			<div class="arena-note comic-panel" aria-hidden="true">
+				<p>THE ORIGINAL<br /><b>SPLASH ZONE!</b></p>
 				<span class="eyebrow">EST. RIGHT NOW</span>
 			</div>
 			<footer class="home-footer">
@@ -278,7 +286,7 @@
 		{:else}
 			<div class="modal-wrap">
 				<section
-					class="panel"
+					class="panel comic-panel"
 					bind:this={focusPanel}
 					tabindex="-1"
 					aria-label={panel === 'board'
@@ -296,7 +304,7 @@
 						}}>← BACK TO THE BATHROOM</button
 					>
 					{#if panel === 'party'}
-						<span class="eyebrow">ONE DEVICE. ZERO DIGNITY.</span>
+						<span class="caption">ONE DEVICE. ZERO DIGNITY.</span>
 						<h2>PASS THE<br /><em>PRESSURE.</em></h2>
 						<p>2–8 players. One round each. Highest score gets bragging rights.</p>
 						<label class="field"
@@ -311,12 +319,12 @@
 								{formError}
 							</p>{/if}<button class="primary full" onclick={startParty}>START THE PARTY ↗</button>
 					{:else if panel === 'board'}
-						<span class="eyebrow">THE WALL OF FAME</span>
+						<span class="caption">THE WALL OF FAME</span>
 						<h2>HIGH<br /><em>SCORES.</em></h2>
 						<Scoreboard {scores} />
 						<p class="fine-print">Top 10 only. A run that misses the board is not recorded.</p>
 					{:else if panel === 'help'}
-						<span class="eyebrow">THE SHORT VERSION</span>
+						<span class="caption">THE SHORT VERSION</span>
 						<h2>MAKE EVERY<br /><em>DROP COUNT.</em></h2>
 						<ol class="instructions">
 							<li>
@@ -357,7 +365,7 @@
 						</ol>
 						<div class="controls-note">MOUSE / TOUCH / ARROW KEYS <span>ESC TO PAUSE</span></div>
 					{:else if panel === 'settings'}
-						<span class="eyebrow">YOUR BATHROOM. YOUR RULES.</span>
+						<span class="caption">YOUR BATHROOM. YOUR RULES.</span>
 						<h2>FINE<br /><em>TUNING.</em></h2>
 						<div class="settings-list">
 							<label
@@ -395,7 +403,7 @@
 							><label
 								><span
 									>Visual quality<small
-										>High adds god rays and shadows. Never changes gameplay or score.</small
+										>High adds crisp shadows and sharper pixels. Never changes gameplay or score.</small
 									></span
 								><select bind:value={settings.quality}
 									><option value="high">High</option><option value="low">Low</option></select
@@ -409,18 +417,23 @@
 	{:else if phase === 'playing' || phase === 'countdown'}
 		<Hud state={$gameStateStore} name={currentName} {best} onpause={() => app?.pause()} />
 		{#if phase === 'countdown'}<div class="countdown" aria-live="polite">
-				<span class="eyebrow"
+				<span class="caption"
 					>{party.length
 						? `TURN ${partyIndex + 1} OF ${party.length} · ${currentName}`
 						: 'GET YOUR AIM TOGETHER'}</span
-				><b>{Math.ceil($gameStateStore.countdown)}</b><span
-					>AIM INSIDE. BLAST BUGS. DON’T RUN DRY.</span
-				>
+				>{#key Math.ceil($gameStateStore.countdown)}<b class="lettering"
+						>{Math.ceil($gameStateStore.countdown)}</b
+					>{/key}<span>AIM INSIDE. BLAST BUGS. DON’T RUN DRY.</span>
 			</div>{/if}
 	{:else if phase === 'paused'}
 		<div class="modal-wrap scrim">
-			<section class="panel compact" bind:this={focusPanel} tabindex="-1" aria-label="Game paused">
-				<span class="eyebrow">TAKE YOUR TIME. WE’LL HOLD IT.</span>
+			<section
+				class="panel comic-panel compact"
+				bind:this={focusPanel}
+				tabindex="-1"
+				aria-label="Game paused"
+			>
+				<span class="caption">TAKE YOUR TIME. WE’LL HOLD IT.</span>
 				<h2>HOLD<br /><em>IT.</em></h2>
 				<p>Pressure, bugs, and drinks are paused.</p>
 				<button class="primary full" onclick={() => app?.resume()}>BACK TO BUSINESS ↗</button
@@ -429,13 +442,13 @@
 		</div>
 	{:else if phase === 'gameover'}
 		<div class="countdown">
-			<span class="eyebrow">THE TANK HAS SPOKEN</span>
-			<h2>OUT OF<br /><em>JUICE.</em></h2>
+			<span class="caption">THE TANK HAS SPOKEN</span>
+			<h2 class="lettering">OUT OF<br /><em>JUICE.</em></h2>
 		</div>
 	{:else if phase === 'results' && entry}
 		<div class="modal-wrap scrim">
 			<section
-				class="panel results"
+				class="panel comic-panel results"
 				bind:this={focusPanel}
 				tabindex="-1"
 				aria-label="Round results"
@@ -510,7 +523,7 @@
 		display: grid;
 		grid-template-rows: auto minmax(0, 1fr) auto;
 		row-gap: 1rem;
-		padding: 1.8rem 3.5rem 0.8rem;
+		padding: 1.8rem 3.5rem 0.9rem;
 	}
 	.menu-home .threejs {
 		position: absolute;
@@ -525,13 +538,22 @@
 	.threejs.aiming {
 		cursor: crosshair;
 	}
+	/* Darker on the menu side so the spotlit bowl stays clear and the hero of the frame. */
 	.menu-shade {
 		position: absolute;
 		inset: 0;
 		background:
-			linear-gradient(90deg, #101c28fa 5%, #101c28ea 32%, #101c2840 64%, #101c2810),
-			linear-gradient(0deg, #101c28 0%, transparent 30%);
+			linear-gradient(90deg, #101c28f0 6%, #101c28a0 30%, transparent 42%),
+			linear-gradient(0deg, #101c28 0%, transparent 22%);
 		pointer-events: none;
+	}
+	/* Print dots fade out before they reach the bowl. */
+	.menu-shade::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: radial-gradient(circle, #0b0d1477 1.3px, transparent 1.8px) 0 0 / 7px 7px;
+		mask-image: linear-gradient(90deg, #000 20%, transparent 40%);
 	}
 	.site-header {
 		position: absolute;
@@ -547,78 +569,79 @@
 		padding: 0;
 	}
 	.brand {
-		text-decoration: none;
-		font: 900 1.3rem var(--display);
-		letter-spacing: -0.05em;
+		font-size: 1.3rem;
 	}
 	.edition {
 		font: 0.6rem var(--mono);
 		letter-spacing: 0.12em;
 		color: var(--muted);
 		display: flex;
-		gap: 0.8rem;
+		gap: 0.9rem;
 		align-items: center;
-	}
-	.edition b {
-		font-weight: 500;
-		border: 1px solid var(--line);
-		padding: 0.4rem 0.55rem;
-		border-radius: 4px;
-		color: var(--paper);
 	}
 	.home {
 		position: relative;
 		align-self: center;
-		margin-left: max(0px, calc(7vw - 3.5rem));
-		width: min(430px, 42vw);
+		margin-left: max(0px, calc(6vw - 3.5rem));
+		width: min(440px, 40vw);
 	}
 	h1 {
-		font: 1000 clamp(5rem, 10vw, 9rem)/0.82 var(--display);
-		letter-spacing: -0.075em;
-		margin: 1.5rem 0 1.15rem;
+		/* Height-capped too: browsers with tall toolbars (Firefox) leave less room for the column. */
+		font-size: clamp(3.5rem, min(11vw, 14vh), 10rem);
+		line-height: 0.86;
+		color: var(--paper);
+		margin: 0 0 0.9rem;
 		position: relative;
 		width: max-content;
+		rotate: -4deg;
 	}
 	h1 > span {
 		color: var(--lime);
 	}
 	h1 svg {
-		width: 48px;
-		height: 48px;
+		width: 52px;
+		height: 52px;
 		position: absolute;
-		right: -65px;
-		bottom: 8px;
+		right: -70px;
+		bottom: 10px;
 		fill: none;
 		stroke: var(--lime);
 		stroke-width: 7;
+		filter: drop-shadow(4px 4px 0 var(--outline));
 	}
 	.tagline {
-		margin: 0;
-		font-size: 1.1rem;
-		letter-spacing: -0.02em;
+		margin: 0 0 1.4rem 0.3rem;
+		font: 1.25rem var(--display);
+		letter-spacing: 0.06em;
+		rotate: -3deg;
 	}
 	.tagline b {
-		color: var(--lime);
+		font-weight: 400;
+		color: #c2185b;
+	}
+	.home-card {
+		--shadow: var(--mint);
+		padding: 1.15rem 1.3rem 0.5rem;
 	}
 	.intro {
 		color: var(--muted);
-		font-size: 1rem;
-		line-height: 1.65;
-		margin: 0.8rem 0 1.15rem;
+		font-size: 0.92rem;
+		line-height: 1.5;
+		margin: 0 0 0.9rem;
 	}
 	.player-field {
 		display: flex;
 		align-items: center;
 		gap: 1rem;
-		margin: 0.5rem 0 0.75rem;
+		margin: 0 0 1rem;
 	}
 	.player-field .eyebrow {
-		font-size: 0.8rem;
+		font-size: 0.72rem;
 		white-space: nowrap;
 	}
 	.player-field input {
 		padding: 0.45rem 0.65rem;
-		font: 700 0.8rem var(--mono);
+		font: 700 0.85rem var(--mono);
 		min-width: 0;
 	}
 	.play {
@@ -626,33 +649,35 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		min-height: 57px;
+		min-height: 60px;
+		font-size: 1.55rem;
 	}
 	.play > span {
-		font-size: 1.8rem;
+		font-size: 1.6rem;
 		line-height: 1;
 	}
 	.menu-actions {
 		display: flex;
-		gap: 0.6rem;
+		gap: 0.75rem;
 		margin-top: 1rem;
 	}
 	.menu-actions button {
 		flex: 1;
-		padding: 0.65rem 0.6rem;
-		font-size: 0.65rem;
+		padding: 0.6rem 0.4rem;
+		font-size: 1rem;
+		white-space: nowrap;
 	}
 	.menu-actions span {
-		color: var(--mint);
-		margin-left: 0.4rem;
-		font: 0.6rem var(--mono);
+		color: var(--muted);
+		margin-left: 0.3rem;
+		font: 700 0.6rem var(--mono);
 	}
 	.minor-actions {
 		display: grid;
 		grid-template-columns: 1fr auto 1fr;
 		align-items: center;
 		gap: 0.8rem;
-		margin-top: 0.85rem;
+		margin-top: 0.5rem;
 	}
 	.minor-actions button:first-child {
 		justify-self: end;
@@ -661,52 +686,73 @@
 		justify-self: start;
 	}
 	.minor-actions > span {
-		color: #ffffff30;
-		font-size: 0.7rem;
+		color: var(--muted);
 	}
-	.minor-actions button {
-		font-size: 0.75rem;
-	}
+	/* Speech bubble that points at the spotlit bowl. */
 	.arena-note {
 		position: absolute;
-		right: 7%;
-		top: 37%;
-		transform: rotate(7deg);
+		right: 8%;
+		top: 24%;
+		padding: 1rem 1.4rem 0.8rem;
+		border-radius: 22px;
+		rotate: 5deg;
+		text-align: center;
+	}
+	.arena-note::after {
+		content: '';
+		position: absolute;
+		left: -15px;
+		top: 58%;
+		width: 26px;
+		height: 26px;
+		background: var(--paper);
+		border: solid var(--outline);
+		border-width: 0 0 3px 3px;
+		transform: rotate(45deg) skew(12deg, 12deg);
 	}
 	.arena-note p {
-		font: 600 1rem/1.4 var(--mono);
-		margin: 0 0 0.4rem;
+		font: 1.6rem/1 var(--display);
+		letter-spacing: 0.04em;
+		margin: 0 0 0.35rem;
 	}
 	.arena-note b {
-		color: var(--mint);
-	}
-	.note-arrow {
-		display: block;
-		color: var(--mint);
-		font-size: 4rem;
-		transform: rotate(-15deg);
+		font-weight: 400;
+		color: var(--lime);
+		-webkit-text-stroke: 0.14em var(--outline);
+		paint-order: stroke fill;
 	}
 	.arena-note .eyebrow {
-		font-size: 0.8rem;
+		font-size: 0.62rem;
 	}
 	.home-footer {
 		position: relative;
 		display: flex;
 		align-items: center;
 		gap: 1.75rem;
-		border-top: 1px solid var(--line);
 		padding-top: 0.5rem;
-		font: 600 0.75rem var(--mono);
-		letter-spacing: 0.05em;
+		border-top: 2px solid #ffffff1c;
+		font: 1.05rem var(--display);
+		letter-spacing: 0.07em;
+	}
+	.home-footer span {
+		white-space: nowrap;
 	}
 	.home-footer i {
-		color: var(--lime);
-		font-style: normal;
-		margin-right: 0.5rem;
+		display: inline-grid;
+		place-items: center;
+		width: 1.7em;
+		height: 1.7em;
+		margin-right: 0.45rem;
+		border: 2px solid var(--outline);
+		border-radius: 50%;
+		background: var(--lime);
+		color: var(--outline);
+		font: 700 0.6rem var(--mono);
 	}
 	.home-footer small {
 		margin-left: auto;
-		font-size: 0.65rem;
+		font: 0.62rem var(--mono);
+		letter-spacing: 0.1em;
 		color: var(--muted);
 	}
 	.modal-wrap {
@@ -718,42 +764,43 @@
 		align-items: safe center;
 		justify-content: center;
 	}
+	/* Print dots instead of blur: the paused scene reads as a comic backdrop, not a haze. */
 	.scrim {
 		padding-top: 1.5rem;
-		background: #09141b9c;
-		backdrop-filter: blur(8px);
+		background:
+			radial-gradient(circle, #0b0d14cc 1.5px, transparent 2px) 0 0 / 6px 6px,
+			#09141b99;
 	}
 	.panel {
+		--shadow: var(--mint);
 		width: min(100%, 570px);
-		padding: 2rem 2.5rem;
-		background: #14222ff5;
-		border: 1px solid #ffffff26;
-		border-radius: 16px;
-		box-shadow: 0 20px 90px #0005;
+		padding: 1.8rem 2.4rem 2rem;
 		outline: none;
 	}
-	.panel > .eyebrow {
-		display: block;
-		margin-top: 0.6rem;
-		color: var(--mint);
-	}
 	.back {
-		font-size: 0.55rem;
+		font-size: 0.85rem;
 		padding-top: 0;
 		min-height: 35px;
 	}
+	.panel > .caption {
+		display: block;
+		margin-top: 0.4rem;
+	}
 	h2 {
-		font: 900 clamp(2rem, 4.5vw, 3rem)/1 var(--display);
-		letter-spacing: -0.065em;
+		font: 400 clamp(2.5rem, 5vw, 3.4rem) / 0.95 var(--display);
+		letter-spacing: 0.02em;
 		margin: 1rem 0;
 	}
 	em {
 		font-style: normal;
 		color: var(--lime);
+		-webkit-text-stroke: 0.1em var(--outline);
+		paint-order: stroke fill;
+		text-shadow: 0.06em 0.06em 0 var(--outline);
 	}
 	.panel > p {
-		font-size: 0.85rem;
-		line-height: 1.65;
+		font-size: 0.9rem;
+		line-height: 1.6;
 		color: var(--muted);
 	}
 	.full {
@@ -762,8 +809,7 @@
 	}
 	.field {
 		display: block;
-		font: 600 0.6rem var(--mono);
-		color: var(--mint);
+		font: 700 0.65rem var(--mono);
 		margin-top: 1.5rem;
 	}
 	.field span {
@@ -773,17 +819,12 @@
 		font-size: 0.55rem;
 	}
 	textarea {
-		width: 100%;
-		background: #0c1822;
-		color: var(--paper);
-		border: 1px solid #ffffff36;
-		border-radius: 8px;
 		resize: vertical;
 		font: 0.9rem/1.8 var(--mono);
-		padding: 0.75rem;
 	}
 	.panel .error {
-		color: var(--coral);
+		color: #c8102e;
+		font-weight: 700;
 	}
 	.panel .fine-print {
 		font: 0.62rem/1.6 var(--mono);
@@ -793,35 +834,35 @@
 	.instructions {
 		list-style: none;
 		padding: 0;
-		margin: 2rem 0;
+		margin: 1.6rem 0;
 		display: grid;
-		gap: 1.5rem;
+		gap: 1.4rem;
 	}
 	.instructions li {
 		display: flex;
 		gap: 1rem;
 	}
 	.instructions li > span {
-		font: 700 0.7rem var(--mono);
-		padding: 0.55rem;
-		border: 1px solid var(--line);
-		border-radius: 6px;
+		font: 1.1rem var(--display);
+		padding: 0.25rem 0.5rem;
+		border: 2px solid var(--outline);
+		box-shadow: 2px 2px 0 var(--outline);
+		background: var(--lime);
 		height: min-content;
-		color: var(--mint);
 	}
 	.instructions b {
-		font-size: 0.9rem;
+		font: 400 1.2rem var(--display);
+		letter-spacing: 0.04em;
 	}
 	.instructions p {
 		margin: 0.3rem 0 0;
-		font-size: 0.8rem;
-		line-height: 1.7;
+		font-size: 0.82rem;
+		line-height: 1.65;
 		color: var(--muted);
 	}
 	.controls-note {
-		font: 0.6rem/2 var(--mono);
-		color: var(--mint);
-		border-top: 1px solid var(--line);
+		font: 700 0.6rem/2 var(--mono);
+		border-top: 2px solid var(--outline);
 		padding-top: 0.8rem;
 	}
 	.controls-note span {
@@ -829,21 +870,23 @@
 		color: var(--muted);
 	}
 	.settings-list {
-		margin-top: 1rem;
+		margin-top: 0.6rem;
 	}
 	.settings-list > label {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
 		gap: 1rem;
-		border-bottom: 1px solid var(--line);
-		padding: 1rem 0;
-		font-size: 0.85rem;
+		border-bottom: 2px dashed var(--line);
+		padding: 0.7rem 0;
+		font-size: 0.9rem;
+		font-weight: 600;
 	}
 	.settings-list small {
 		display: block;
 		color: var(--muted);
-		font-size: 0.65rem;
+		font-size: 0.68rem;
+		font-weight: 400;
 		margin-top: 0.3rem;
 	}
 	.settings-list select,
@@ -858,23 +901,48 @@
 		align-items: center;
 		justify-content: center;
 		flex-direction: column;
-		background: #101c285e;
+		gap: 0.4rem;
+		background: #101c2850;
 		pointer-events: none;
 		text-align: center;
 	}
 	.countdown > b {
-		font: 900 10rem/1.4 var(--display);
+		font-size: 11rem;
+		line-height: 1.1;
 		color: var(--lime);
+		rotate: -4deg;
+		animation: pop 0.35s cubic-bezier(0.2, 1.6, 0.4, 1) both;
 	}
 	.countdown > span:last-child {
-		font: 600 0.6rem var(--mono);
-		letter-spacing: 0.1em;
+		font: 1.25rem var(--display);
+		letter-spacing: 0.08em;
+		text-shadow: 2px 2px 0 var(--outline);
 	}
-	.countdown .eyebrow {
+	.countdown h2 {
+		font-size: clamp(3.5rem, 9vw, 6rem);
 		color: var(--paper);
+		rotate: -3deg;
+	}
+	@keyframes pop {
+		from {
+			scale: 1.7;
+			opacity: 0;
+		}
+	}
+	.reduced-motion .countdown > b {
+		animation: none;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.countdown > b {
+			animation: none;
+		}
 	}
 	.compact {
+		--shadow: var(--coral);
 		max-width: 430px;
+	}
+	.results {
+		--shadow: var(--lime);
 	}
 	.result-top {
 		display: flex;
@@ -885,52 +953,62 @@
 	.result-top .eyebrow {
 		font-size: 0.55rem;
 	}
+	/* Rubber stamp on the result card. */
 	.stamp {
-		color: var(--mint);
-		font: 700 0.55rem var(--mono);
-		text-align: right;
+		color: #c2185b;
+		border: 3px solid currentColor;
+		border-radius: 4px;
+		padding: 0.15rem 0.6rem;
+		font: 1.05rem var(--display);
+		letter-spacing: 0.06em;
+		text-align: center;
+		rotate: 6deg;
 	}
 	.results h2 {
-		font-size: clamp(1.7rem, 4vw, 2.5rem);
-		margin: 1.4rem 0 0.5rem;
+		font-size: clamp(2rem, 4vw, 2.7rem);
+		margin: 1.2rem 0 0.4rem;
 	}
 	.final-score {
-		font: 900 clamp(3.5rem, 8vw, 5rem)/1.3 var(--display);
-		letter-spacing: -0.05em;
+		font: 400 clamp(4rem, 9vw, 6rem) / 1.15 var(--display);
+		letter-spacing: 0.02em;
 	}
 	.final-score span {
 		margin-left: 0.7rem;
-		font: 0.6rem var(--mono);
+		font: 700 0.6rem var(--mono);
 		letter-spacing: 0.1em;
 		color: var(--muted);
 	}
 	.result-stats {
 		display: grid;
 		grid-template-columns: repeat(4, 1fr);
-		gap: 0.5rem;
-		padding: 1rem 0 1.5rem;
-		border-bottom: 1px solid var(--line);
+		gap: 0.6rem;
+		padding: 0.4rem 0 0.6rem;
+	}
+	.result-stats > div {
+		background: #fff;
+		border: 2px solid var(--outline);
+		box-shadow: 3px 3px 0 var(--outline);
+		padding: 0.45rem 0.55rem;
 	}
 	.result-stats b {
 		display: block;
-		font: 800 1.4rem var(--display);
-		color: var(--mint);
+		font: 400 1.6rem var(--display);
+		letter-spacing: 0.03em;
 	}
 	.result-stats span {
 		display: block;
-		font: 0.5rem var(--mono);
+		font: 700 0.5rem var(--mono);
 		color: var(--muted);
-		margin-top: 0.3rem;
+		margin-top: 0.2rem;
 	}
 	.result-actions {
 		display: flex;
-		gap: 0.65rem;
+		gap: 0.75rem;
 		margin-top: 1.5rem;
 	}
 	.result-actions button {
 		flex: 1;
-		font-size: 0.7rem;
-		padding: 0.8rem 0.6rem;
+		padding: 0.75rem 0.6rem;
 	}
 	.party-standings {
 		margin-top: 1.5rem;
@@ -938,7 +1016,9 @@
 	.loading-screen {
 		position: absolute;
 		inset: 0;
-		background: var(--ink);
+		background:
+			radial-gradient(circle, #ffffff0d 1.3px, transparent 1.8px) 0 0 / 8px 8px,
+			var(--ink);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -947,13 +1027,15 @@
 		text-align: center;
 	}
 	.loading-screen .brand {
-		margin-bottom: 3rem;
+		margin-bottom: 2.5rem;
 		color: var(--lime);
-		font-size: 2rem;
+		font-size: 3.5rem;
+		rotate: -4deg;
 	}
 	.loading-screen h1 {
-		font-size: 2.5rem;
-		line-height: 1.1;
+		font-size: 2.8rem;
+		line-height: 1.05;
+		width: auto;
 	}
 	.loading-screen p {
 		color: var(--muted);
@@ -962,16 +1044,16 @@
 		line-height: 1.6;
 	}
 	.loading-track {
-		width: min(250px, 70vw);
-		height: 5px;
-		background: #ffffff15;
-		margin: 1.5rem 0 0.5rem;
-		border-radius: 5px;
-		overflow: hidden;
+		width: min(260px, 70vw);
+		height: 20px;
+		padding: 3px;
+		border: 3px solid var(--paper);
+		border-radius: 3px;
+		margin: 1.2rem 0 0.5rem;
 	}
 	.loading-track > div {
 		height: 100%;
-		background: var(--lime);
+		background: repeating-linear-gradient(90deg, var(--lime) 0 12px, transparent 12px 15px);
 		transition: width 0.3s;
 	}
 	@media (max-width: 800px) {
@@ -980,12 +1062,14 @@
 			padding: 1.25rem 1.5rem;
 		}
 		.home {
-			margin-left: max(0px, calc(6vw - 1.5rem));
-			width: min(370px, 48vw);
+			margin-left: 0;
+			width: min(380px, 46vw);
 		}
 		.arena-note {
-			right: 5%;
-			font-size: 0.6rem;
+			right: 3%;
+		}
+		.arena-note p {
+			font-size: 1.2rem;
 		}
 		.home-footer {
 			gap: 1rem;
@@ -998,58 +1082,70 @@
 		}
 	}
 	@media (max-width: 600px) {
+		/* Portrait: title up top, controls at the bottom, the spotlit bowl in between. */
 		.menu-shade {
-			background: #101c28d9;
+			background: linear-gradient(0deg, #101c28 30%, transparent 46%, transparent 68%, #101c28c0);
+		}
+		.menu-shade::before {
+			mask-image: linear-gradient(0deg, #000 30%, transparent 46%);
+		}
+		.menu-home {
+			padding-bottom: 0.9rem;
 		}
 		.edition {
 			font-size: 0.5rem;
 		}
-		.edition b {
-			display: none;
-		}
 		.home {
-			width: min(370px, 100%);
+			width: min(400px, 100%);
 			margin: 0 auto;
+			align-self: stretch;
+			display: flex;
+			flex-direction: column;
 		}
 		h1 {
-			font-size: clamp(5rem, 19vw, 7.5rem);
-			margin-top: 1.1rem;
+			font-size: clamp(4.5rem, 22vw, 7rem);
+			margin-top: 0.5rem;
+		}
+		.home-card {
+			margin-top: auto;
 		}
 		.arena-note {
 			display: none;
 		}
 		.home-footer {
 			justify-content: space-between;
-			font-size: 0.7rem;
+			font-size: 0.85rem;
 			gap: 0.25rem;
 		}
 		.panel {
-			padding: 1.6rem;
+			padding: 1.5rem 1.4rem;
 		}
 		.modal-wrap {
-			padding: 5rem 0.75rem 1rem;
+			padding: 5rem 1rem 1.2rem 0.75rem;
 		}
 		.scrim {
 			padding-top: 1rem;
 		}
-		.minor-actions {
-			gap: 0.7rem;
+		.result-stats {
+			grid-template-columns: repeat(2, 1fr);
 		}
 	}
 	@media (max-height: 740px) {
-		.home h1 {
-			font-size: clamp(4rem, 9vw, 7rem);
-			margin: 0.7rem 0;
+		.tagline {
+			margin-bottom: 1rem;
 		}
 		.intro {
 			line-height: 1.4;
-			margin: 0.4rem 0 0.6rem;
+			margin-bottom: 0.6rem;
+		}
+		.player-field {
+			margin-bottom: 0.7rem;
 		}
 		.menu-actions {
-			margin-top: 0.4rem;
+			margin-top: 0.7rem;
 		}
 		.minor-actions button {
-			min-height: 32px;
+			min-height: 34px;
 		}
 		.home-footer {
 			padding-top: 0.35rem;
@@ -1057,26 +1153,51 @@
 	}
 	@media (max-height: 740px) and (max-width: 600px) {
 		.home h1 {
-			font-size: clamp(4rem, 16vw, 6rem);
+			font-size: clamp(4rem, 17vw, 6rem);
+		}
+		.intro {
+			display: none;
 		}
 	}
 	@media (max-width: 380px) {
 		.home-footer {
-			font-size: 0.62rem;
+			font-size: 0.75rem;
 		}
 	}
-	@media (max-height: 520px) {
+	@media (max-height: 700px) {
+		.intro {
+			display: none;
+		}
+	}
+	@media (max-height: 620px) {
+		/* Short screens (landscape phones, small windows): title left, controls right,
+		   the bowl framed between them. */
 		.home {
-			width: min(600px, 90vw);
+			width: 100%;
+			margin: 0;
 			display: grid;
-			grid-template-columns: 1fr 1fr;
-			gap: 0.6rem 1.5rem;
+			grid-template-columns: auto 1fr min(300px, 38vw);
+			align-items: center;
 		}
 		.home h1 {
-			grid-column: 1;
-			grid-row: 1 / 5;
-			font-size: 5.5rem;
-			margin: 0.5rem 0;
+			font-size: clamp(3.5rem, 16vh, 6rem);
+			margin: 0;
+		}
+		.player-field .eyebrow {
+			font-size: 0.6rem;
+			letter-spacing: 0.06em;
+		}
+		h1 svg {
+			display: none;
+		}
+		.home-card {
+			grid-column: 3;
+			grid-row: 1;
+			margin: 0;
+			padding: 0.8rem 1rem 0.3rem;
+		}
+		.menu-actions button {
+			font-size: 0.85rem;
 		}
 		.intro,
 		.tagline,
@@ -1084,18 +1205,8 @@
 		.home-footer {
 			display: none;
 		}
-		.player-field,
-		.play,
-		.menu-actions,
-		.minor-actions {
-			grid-column: 2;
-			margin: 0;
-		}
-		.menu-actions {
-			margin-top: 0.5rem;
-		}
 	}
-	@media (max-height: 520px) and (max-width: 600px) {
+	@media (max-height: 620px) and (max-width: 600px) {
 		.home {
 			display: block;
 			width: 100%;

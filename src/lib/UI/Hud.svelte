@@ -11,9 +11,11 @@
 
 <div class="hud">
 	<div class="score-block">
-		<span class="eyebrow">{name} / SCORE</span><strong
-			>{Math.floor(state.score).toLocaleString().padStart(4, '0')}</strong
-		><small>BEST {best.toLocaleString()}</small>
+		<div class="score-card">
+			<span class="eyebrow">{name} / SCORE</span><strong
+				>{Math.floor(state.score).toLocaleString().padStart(4, '0')}</strong
+			><small>BEST {best.toLocaleString()}</small>
+		</div>
 		<span class="wave-status"
 			>{state.wave === 0 ? 'GET READY!' : `WAVE ${state.wave}`}<small
 				>{state.waveRemaining > 0
@@ -24,7 +26,7 @@
 			></span
 		>
 	</div>
-	<div class="pressure" class:low={state.pressure <= 20}>
+	<div class="pressure comic-panel" class:low={state.pressure <= 20}>
 		<div class="pressure-label">
 			<span class="eyebrow">{state.pressure <= 20 ? '⚠ RUNNING ON EMPTY' : 'TANK PRESSURE'}</span><b
 				>{Math.ceil(state.pressure)}<small>%</small></b
@@ -45,7 +47,7 @@
 	<button type="button" class="pause-button" onclick={onpause} aria-label="Pause game">Ⅱ</button>
 </div>
 <div class="game-bottom">
-	{#if state.drink}<div class="drink-badge">
+	{#if state.drink}<div class="drink-badge comic-panel">
 			<span aria-hidden="true">{state.drink.kind === 'beer' ? '◉' : '☕'}</span>
 			<div>
 				<b>{DRINKS[state.drink.kind].name}</b><small
@@ -54,7 +56,7 @@
 						: '+50% FLOW · LASER PRECISION'}</small
 				>
 			</div>
-		</div>{:else}<div class="streak-meter">
+		</div>{:else}<div class="streak-meter comic-panel">
 			<div class="hint">HOLD THE BOWL <span>·</span> EARN A POWER-UP</div>
 			<div class="streak-label">
 				<b>CLEAN STREAK</b><span
@@ -93,163 +95,213 @@
 		display: flex;
 		align-items: flex-start;
 		gap: 1.5rem;
-		padding: 1.8rem 2.4rem;
+		padding: 1.6rem 2.2rem;
 		pointer-events: none;
-		background: linear-gradient(#101c2bd9, transparent);
 	}
 	.score-block {
 		display: grid;
-		gap: 0.2rem;
+		justify-items: start;
+		gap: 0.7rem;
 		margin-right: auto;
 	}
-	.score-block strong {
-		font: 800 clamp(2rem, 5vw, 4rem)/1 var(--display);
-		letter-spacing: 0.02em;
+	/* Narration caption box: the classic yellow comic panel. */
+	.score-card {
+		display: grid;
+		gap: 0.15rem;
+		padding: 0.5rem 0.9rem 0.45rem;
+		background: var(--caption);
+		color: var(--outline);
+		border: 3px solid var(--outline);
+		box-shadow: 5px 5px 0 var(--outline);
+		rotate: -1.5deg;
 	}
-	.score-block small,
-	.pressure-caption {
-		color: var(--muted);
-		font: 700 0.65rem var(--mono);
+	.score-card .eyebrow {
+		color: var(--outline);
+		font-size: 0.58rem;
+	}
+	.score-card strong {
+		font: 400 clamp(2.4rem, 5vw, 3.8rem) / 0.95 var(--display);
+		letter-spacing: 0.04em;
+	}
+	.score-card small {
+		font: 700 0.6rem var(--mono);
 		letter-spacing: 0.1em;
+		color: #5c4a00;
 	}
 	.wave-status {
-		margin-top: 0.45rem;
-		color: var(--mint);
-		font: 800 0.8rem var(--mono);
-		text-shadow: 0 1px 5px #101c28;
+		padding: 0.25rem 0.55rem;
+		background: var(--mint);
+		color: var(--outline);
+		border: 2px solid var(--outline);
+		box-shadow: 3px 3px 0 var(--outline);
+		font: 1rem var(--display);
+		letter-spacing: 0.06em;
+		rotate: 1.5deg;
 	}
 	.wave-status small {
-		display: block;
-		margin-top: 0.2rem;
-		font-size: 0.55rem;
+		margin-left: 0.5rem;
+		font: 700 0.55rem var(--mono);
+		letter-spacing: 0.08em;
 	}
 	.pressure {
-		width: min(29vw, 280px);
-		padding-top: 0.1rem;
+		width: min(29vw, 290px);
+		padding: 0.6rem 0.8rem 0.55rem;
+		box-shadow: 5px 5px 0 var(--outline);
 	}
 	.pressure-label {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		gap: 0.75rem;
-		margin-bottom: 0.65rem;
+		margin-bottom: 0.4rem;
+	}
+	.pressure-label .eyebrow {
+		color: var(--outline);
 	}
 	.pressure-label b {
-		font: 800 1.7rem var(--display);
-		color: var(--lime);
+		font: 400 1.9rem/1 var(--display);
+		letter-spacing: 0.03em;
 	}
 	.pressure-label b small {
-		font-size: 0.9rem;
+		font-size: 1rem;
 	}
 	.gauge {
-		height: 15px;
-		background: #07131dcc;
+		height: 18px;
+		background: var(--outline);
 		padding: 3px;
-		border: 1px solid #ffffff26;
-		border-radius: 4px;
-		margin-bottom: 0.5rem;
+		border: 2px solid var(--outline);
+		margin-bottom: 0.4rem;
 	}
 	.gauge > div {
 		height: 100%;
 		background: repeating-linear-gradient(90deg, var(--lime) 0 12px, transparent 12px 15px);
 		transition: width 0.1s linear;
 	}
+	.low {
+		background: var(--halftone), #ffd9d9;
+	}
 	.low .gauge > div {
-		background: var(--coral);
+		background: repeating-linear-gradient(90deg, var(--coral) 0 12px, transparent 12px 15px);
 	}
 	.low .pressure-label b {
-		color: var(--coral);
+		color: #c8102e;
+	}
+	.pressure-caption {
+		font: 700 0.58rem var(--mono);
+		letter-spacing: 0.1em;
+		color: var(--muted);
 	}
 	.pause-button {
 		pointer-events: auto;
 		width: 48px;
 		height: 48px;
-		border: 1px solid #ffffff4a;
-		border-radius: 50%;
-		background: #132332b3;
-		color: var(--paper);
-		font-size: 1.3rem;
+		border: 3px solid var(--outline);
+		border-radius: 4px;
+		background: var(--paper);
+		color: var(--outline);
+		box-shadow: 4px 4px 0 var(--outline);
+		font: 1.4rem var(--display);
+	}
+	.pause-button:active {
+		translate: 3px 3px;
+		box-shadow: 1px 1px 0 var(--outline);
 	}
 	.game-bottom {
 		position: absolute;
 		bottom: max(1.6rem, env(safe-area-inset-bottom));
-		left: 2.4rem;
-		right: 2.4rem;
+		left: 2.2rem;
+		right: 2.2rem;
 		display: flex;
 		justify-content: space-between;
 		align-items: flex-end;
 		gap: 1rem;
 		pointer-events: none;
 	}
-	.hint,
-	.kill-count {
-		font: 700 0.65rem var(--mono);
+	.hint {
+		font: 700 0.6rem var(--mono);
 		letter-spacing: 0.08em;
-		text-shadow: 0 1px 8px #000;
+		color: var(--muted);
 	}
 	.hint span {
-		color: var(--lime);
-		padding: 0 0.6rem;
+		padding: 0 0.4rem;
+	}
+	.kill-count {
+		padding: 0.35rem 0.8rem 0.45rem;
+		background: var(--mint);
+		color: var(--outline);
+		border: 3px solid var(--outline);
+		box-shadow: 5px 5px 0 var(--outline);
+		font: 700 0.58rem var(--mono);
+		letter-spacing: 0.08em;
+		text-align: center;
+		rotate: 2deg;
 	}
 	.kill-count b {
-		font: 800 2rem var(--display);
+		font: 400 2.2rem/1 var(--display);
 		display: block;
-		color: var(--mint);
 	}
 	.streak-meter {
 		width: min(320px, 62vw);
-		padding: 0.7rem 0.9rem;
-		border: 1px solid #ffffff36;
-		border-radius: 10px;
-		background: #101e2ae8;
+		padding: 0.6rem 0.85rem 0.7rem;
+		box-shadow: 5px 5px 0 var(--outline);
 	}
 	.streak-label {
 		display: flex;
 		justify-content: space-between;
 		gap: 0.5rem;
-		margin: 0.6rem 0 0.4rem;
+		margin: 0.35rem 0 0.35rem;
 		font: 700 0.6rem var(--mono);
-		color: var(--mint);
+	}
+	.streak-label b {
+		font: 400 1.1rem var(--display);
+		letter-spacing: 0.06em;
 	}
 	.streak-meter .gauge {
 		margin-bottom: 0;
 	}
 	.drink-badge {
 		display: flex;
+		align-items: center;
 		gap: 0.7rem;
-		padding: 0.7rem 1rem;
-		border: 1px solid var(--lime);
-		border-radius: 10px;
-		background: #101e2ae8;
+		padding: 0.6rem 1rem;
+		background: var(--halftone), var(--lime);
+		box-shadow: 5px 5px 0 var(--outline);
+		rotate: -1.5deg;
 	}
 	.drink-badge > span {
-		color: var(--lime);
 		font-size: 1.8rem;
 	}
 	.drink-badge b {
 		display: block;
-		font-size: 0.9rem;
+		font: 400 1.4rem/1 var(--display);
+		letter-spacing: 0.05em;
 	}
 	.drink-badge small {
-		font: 600 0.6rem var(--mono);
-		color: var(--lime);
+		display: block;
+		margin-top: 0.2rem;
+		font: 700 0.6rem/1.4 var(--mono);
 	}
+	/* Burst-style call-out: inked box, comic lettering, a quick pop. */
 	.notice {
 		position: absolute;
-		top: 27%;
+		top: 24%;
 		left: 50%;
-		transform: translateX(-50%);
 		pointer-events: none;
-		padding: 0.75rem 1.2rem;
-		border-radius: 8px;
+		padding: 0.5rem 1.1rem;
+		border: 3px solid var(--outline);
+		box-shadow: 5px 5px 0 var(--outline);
 		background: var(--mint);
-		color: var(--ink);
-		font: 800 0.8rem var(--mono);
+		color: var(--outline);
+		font: 1.4rem var(--display);
+		letter-spacing: 0.06em;
 		text-align: center;
+		translate: -50% 0;
+		rotate: -3deg;
 		animation: announce 1.8s both;
 	}
 	.notice.bad {
 		background: var(--coral);
+		rotate: 3deg;
 	}
 	.notice.quick {
 		background: var(--lime);
@@ -257,52 +309,121 @@
 	@keyframes announce {
 		0% {
 			opacity: 0;
-			translate: 0 8px;
+			scale: 1.5;
 		}
-		12%,
+		10% {
+			opacity: 1;
+			scale: 0.94;
+		}
+		16%,
 		75% {
 			opacity: 1;
-			translate: 0 0;
+			scale: 1;
 		}
 		100% {
 			opacity: 0;
 		}
 	}
+	@keyframes fade {
+		0%,
+		100% {
+			opacity: 0;
+		}
+		12%,
+		75% {
+			opacity: 1;
+		}
+	}
+	:global(.reduced-motion) .notice {
+		animation-name: fade;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.notice {
+			animation-name: fade;
+		}
+	}
 	@media (max-width: 600px) {
 		.hud {
-			padding: 1rem;
-			gap: 0.75rem;
+			padding: 0.9rem;
+			gap: 0.7rem;
+		}
+		.score-card {
+			padding: 0.35rem 0.6rem;
+		}
+		.score-card strong {
+			font-size: 2.2rem;
+		}
+		.wave-status {
+			font-size: 0.85rem;
+		}
+		.wave-status small {
+			display: block;
+			margin: 0;
 		}
 		.pressure {
-			width: 43vw;
+			width: 44vw;
+			padding: 0.45rem 0.55rem;
 		}
 		.pressure .eyebrow {
-			font-size: 0.55rem;
-		}
-		.pressure-caption {
 			font-size: 0.5rem;
 		}
-		.pressure-label {
-			gap: 0.2rem;
+		.pressure-label b {
+			font-size: 1.5rem;
+		}
+		.pressure-caption {
+			display: none;
+		}
+		.pause-button {
+			width: 42px;
+			height: 42px;
 		}
 		.game-bottom {
-			left: 1rem;
-			right: 1rem;
-			bottom: 1rem;
+			left: 0.9rem;
+			right: 0.9rem;
+			bottom: max(0.9rem, env(safe-area-inset-bottom));
 		}
 		.hint {
-			max-width: 190px;
-			line-height: 1.7;
+			display: none;
 		}
 		.kill-count {
-			text-align: right;
-			font-size: 0.55rem;
+			font-size: 0.5rem;
+		}
+		.kill-count b {
+			font-size: 1.8rem;
 		}
 		.notice {
 			width: max-content;
 			max-width: 85vw;
-			top: 24%;
-			font-size: 0.65rem;
+			font-size: 1.1rem;
+		}
+	}
+	@media (max-height: 520px) {
+		.hud {
+			padding: 0.8rem 1rem;
+		}
+		.score-card strong {
+			font-size: 2rem;
+		}
+		.pressure {
+			width: min(34vw, 260px);
+			padding: 0.4rem 0.6rem;
+		}
+		.pressure-caption {
+			display: none;
+		}
+		.notice {
+			top: 36%;
+			font-size: 1.1rem;
+		}
+		.game-bottom {
+			bottom: max(0.8rem, env(safe-area-inset-bottom));
+		}
+		.drink-badge,
+		.streak-meter {
+			padding: 0.4rem 0.7rem;
+		}
+		.kill-count b {
+			font-size: 1.6rem;
 		}
 	}
 </style>

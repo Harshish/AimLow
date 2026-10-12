@@ -43,12 +43,12 @@
 		font: 500 0.6rem var(--mono);
 		padding: 1rem 0.7rem;
 		letter-spacing: 0.08em;
-		border-bottom: 1px solid var(--line);
+		border-bottom: 2px solid var(--outline);
 	}
 	tbody td,
 	tbody th {
 		padding: 0.9rem 0.7rem;
-		border-bottom: 1px solid #ffffff0a;
+		border-bottom: 2px dashed var(--line);
 		font-size: 0.85rem;
 	}
 	tbody th {
@@ -67,26 +67,32 @@
 		text-align: right;
 	}
 	td:last-child {
-		font: 800 1.1rem var(--display);
+		font: 400 1.3rem var(--display);
 		letter-spacing: 0.04em;
 	}
 	.gold {
-		color: var(--lime);
+		padding: 0.1rem 0.35rem;
+		background: var(--lime);
+		color: var(--outline);
+		border: 2px solid var(--outline);
 	}
 	.highlight {
-		background: #dfff6a0a;
-		color: var(--lime);
+		background: var(--caption);
 	}
 	.empty {
 		padding: 2.5rem 0;
 		text-align: center;
-		font-weight: 700;
+		font: 1.5rem var(--display);
+		letter-spacing: 0.04em;
 	}
 	.empty span {
 		display: inline-block;
 		margin-top: 0.5rem;
 		color: var(--muted);
-		font-weight: 400;
-		font-size: 0.85rem;
+		font:
+			0.85rem 'Avenir Next',
+			'Segoe UI',
+			sans-serif;
+		letter-spacing: 0;
 	}
 </style>

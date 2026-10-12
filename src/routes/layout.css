@@ -1,6 +1,13 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
 
+/* Self-hosted (OFL): no third-party font request leaves the player's browser. */
+@font-face {
+	font-family: 'Bangers';
+	src: url('/fonts/bangers-latin.woff2') format('woff2');
+	font-display: swap;
+}
+
 :root {
 	font-size: clamp(16px, 1.2vw, 20px);
 	font-family: 'Avenir Next', 'Segoe UI', sans-serif;
@@ -12,10 +19,15 @@
 	--lime: #dfff6a;
 	--mint: #8ae8d2;
 	--coral: #ff7c7e;
+	--caption: #ffe45c;
 	--muted: #9baeb7;
 	--line: #ffffff21;
-	--display: 'Arial Black', 'Avenir Next', 'Segoe UI', sans-serif;
+	/* Same ink as the 3D toon outline, so UI and scene share one pen. */
+	--outline: #0b0d14;
+	--focus: #2f7dff;
+	--display: 'Bangers', 'Arial Black', 'Avenir Next', sans-serif;
 	--mono: 'SFMono-Regular', Consolas, monospace;
+	--halftone: radial-gradient(circle, #0b0d1422 1.2px, transparent 1.6px) 0 0 / 7px 7px;
 }
 * {
 	box-sizing: border-box;
@@ -45,9 +57,10 @@ select {
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
-select:focus-visible {
-	outline: 3px solid var(--mint);
-	outline-offset: 4px;
+select:focus-visible,
+textarea:focus-visible {
+	outline: 3px solid var(--focus);
+	outline-offset: 3px;
 }
 a {
 	color: inherit;
@@ -57,64 +70,114 @@ a {
 	letter-spacing: 0.14em;
 	color: var(--muted);
 }
+
+/* Comic primitives: paper panel, caption tag, and inked lettering. */
+.comic-panel {
+	--muted: #4f5a66;
+	--line: #0b0d1424;
+	color: var(--outline);
+	background: var(--halftone), var(--paper);
+	border: 3px solid var(--outline);
+	border-radius: 4px;
+	box-shadow: 7px 7px 0 var(--shadow, var(--outline));
+}
+.caption {
+	display: inline-block;
+	width: max-content;
+	max-width: 100%;
+	padding: 0.3rem 0.6rem;
+	background: var(--caption);
+	color: var(--outline);
+	border: 2px solid var(--outline);
+	box-shadow: 3px 3px 0 var(--outline);
+	font: 700 0.62rem var(--mono);
+	letter-spacing: 0.12em;
+	rotate: -2deg;
+}
+.lettering {
+	font-family: var(--display);
+	font-weight: 400;
+	letter-spacing: 0.02em;
+	-webkit-text-stroke: var(--stroke, 0.1em) var(--outline);
+	paint-order: stroke fill;
+	text-shadow: 0.07em 0.07em 0 var(--outline);
+}
+
 .primary,
 .secondary,
 .text-button {
 	min-height: 48px;
-	border-radius: 8px;
-	font-size: 0.85rem;
-	font-weight: 800;
-	letter-spacing: 0.025em;
+	border-radius: 4px;
+	font-family: var(--display);
+	font-weight: 400;
+	font-size: 1.05rem;
+	letter-spacing: 0.06em;
+}
+.primary,
+.secondary {
+	color: var(--outline);
+	border: 3px solid var(--outline);
+	box-shadow: 4px 4px 0 var(--outline);
+	transition:
+		translate 0.1s,
+		box-shadow 0.1s;
 }
 .primary {
 	background: var(--lime);
-	color: var(--ink);
-	border: 1px solid var(--lime);
-	padding: 0.95rem 1.4rem;
-	box-shadow: 0 5px 0 #aec63c;
-	transition:
-		translate 0.15s,
-		background 0.15s;
-}
-.primary:hover:not(:disabled) {
-	background: #eaff9f;
-	translate: 0 -2px;
+	padding: 0.8rem 1.4rem;
 }
 .secondary {
-	background: #ffffff07;
-	border: 1px solid #ffffff2e;
-	color: var(--paper);
-	padding: 0.9rem 1.2rem;
+	background: #fff;
+	padding: 0.75rem 1.2rem;
 }
+.primary:hover:not(:disabled),
 .secondary:hover {
-	background: #ffffff10;
+	translate: -2px -2px;
+	box-shadow: 6px 6px 0 var(--outline);
+}
+.primary:active:not(:disabled),
+.secondary:active {
+	translate: 3px 3px;
+	box-shadow: 1px 1px 0 var(--outline);
 }
 .text-button {
 	border: 0;
 	background: transparent;
 	color: var(--muted);
 	padding: 0.65rem 0.2rem;
-	font-size: 0.75rem;
+	font-size: 0.95rem;
 }
 .text-button:hover {
-	color: var(--paper);
+	color: var(--outline);
+	text-decoration: underline 2px;
+	text-underline-offset: 4px;
 }
 input:not([type='checkbox']):not([type='range']),
-select {
-	color: var(--paper);
-	background: #0b1721;
-	border: 1px solid #ffffff36;
-	border-radius: 6px;
+select,
+textarea {
+	color: var(--outline);
+	background: #fff;
+	border: 2px solid var(--outline);
+	border-radius: 3px;
 	padding: 0.75rem;
 	width: 100%;
 }
-input[type='checkbox'],
 input[type='range'] {
-	accent-color: var(--lime);
+	accent-color: var(--outline);
 }
 input[type='checkbox'] {
-	width: 20px;
-	height: 20px;
+	width: 22px;
+	height: 22px;
+	color: var(--lime);
+	background-color: #fff;
+	border: 2px solid var(--outline);
+	border-radius: 3px;
+}
+input[type='checkbox']:checked,
+input[type='checkbox']:checked:hover,
+input[type='checkbox']:checked:focus {
+	border-color: var(--outline);
+	background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%230b0d14' stroke-width='2.6'/%3e%3c/svg%3e");
 }
 .reduced-motion *,
 .reduced-motion *::before,
