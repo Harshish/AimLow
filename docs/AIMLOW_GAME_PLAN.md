@@ -1,6 +1,6 @@
 # Aim Low — Game Design and Implementation Plan
 
-**Status:** Local arcade implementation and the browser top-10 board are implemented. Current focus is gameplay feedback, not public launch. Balance values remain playtest defaults. See `README.md` for local setup and checks.
+**Historical plan:** This describes the original arcade prototype. The static solo version no longer has party play, score sharing, or a leaderboard. See `README.md` for current setup and deployment.
 
 ## 1. Game pitch
 

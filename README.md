@@ -1,8 +1,8 @@
 # Aim Low
 
-**Low aim. High scores.** A local browser arcade party game built with SvelteKit, Three.js, and Rapier.
+**Low aim. High scores.** A single-player browser game built with SvelteKit, Three.js, and Rapier.
 
-Test your reactions: snap to animated spiders and wasps for quick burst kills, then return to the bowl. Faster reactions and faster bugs pay more. A clean 2.5-second bowl streak earns a stream power-up. When the tank empties, compare scores and pass the device.
+Test your reactions: snap to animated spiders and wasps for quick burst kills, then return to the bowl. Faster reactions and faster bugs pay more. A clean 2.5-second bowl streak earns a stream power-up. When the tank empties, check your round stats and try again.
 
 ## Run locally
 
@@ -16,7 +16,13 @@ pnpm check
 pnpm build
 ```
 
-The game includes solo play, 2–8-player same-device party play, leaderboards, instructions, settings, and score cards. Current focus: gameplay iteration. No public-launch or deployment work.
+## Deploy
+
+Run `pnpm build` and publish the contents of `build/` at the root of your domain. The build includes `index.html` and all game assets. No Node process, database, API, or rewrite rules are needed on the host.
+
+For a local preview, run `pnpm preview` and open the URL it prints.
+
+Only game settings are saved in the browser. There are no player names, saved scores, or multiplayer modes.
 
 ### Controls
 
@@ -37,22 +43,12 @@ The game includes solo play, 2–8-player same-device party play, leaderboards, 
 - Bugs use six randomized ground/air lanes set farther from the urinal. Wider camera framing and aim bounds keep them reachable. Reduced motion disables cosmetic pop/spin, not gameplay movement; the HUD shows streak progress and the active reward.
 - Faster shots and keyboard aiming reduce target-switching delay. Low pressure retains enough jet speed and damage for a recovery kill.
 - Normal bowl flow earns 100 points per second; Foam Party earns up to 125 and Coffee Laser up to 150. Spills cost 35 per full-flow second. Accuracy includes successful bowl and bug hits.
-- Rebalanced waves, bug pace, and kill rewards use the `arcade-8` leaderboard. Older scores remain stored separately.
-
-## Local score storage
-
-Arcade style: type a name, play. At the end of a round the score is recorded only if it makes the top 10; otherwise it is shown and discarded.
-
-- **High scores:** the top 10 for the current rules version, in versioned `localStorage`. If storage is unavailable, the board lives in memory until the page closes.
-- **Party standings:** an in-memory ranking for the current group of players.
-
-Scores are casual and client-reported, not a competitive anti-cheat system. Stored entries are validated on load; malformed data is dropped.
 
 ## Runtime design
 
 ```text
-+page.svelte          UI flow, party turns, results and top-10 status
-  Hud / Scoreboard   Presentational components
++page.svelte          Solo menu, help, settings, pause, and round results
+  Hud                Live round status
   App                Startup, input/audio wiring, UI snapshots, teardown
     Session          Pure rules: phases, pressure, score, bowl streaks, power-ups, results
     InputController  Canvas-relative pointer/touch + keyboard aim; focus loss
@@ -78,11 +74,11 @@ Scores are casual and client-reported, not a competitive anti-cheat system. Stor
 - Settings affect presentation and keyboard speed, not scoring. Balance values live in `src/lib/Game/config.ts`.
 - The unused character-movement prototype and testing-only OrbitControls were removed.
 
-See [the gameplay plan](docs/AIMLOW_GAME_PLAN.md) for current rules and milestones. Look-and-feel knobs and a browser checklist live in [the tuning guide](docs/TUNING.md). Balance and gameplay remain open for feedback.
+See [the original gameplay plan](docs/AIMLOW_GAME_PLAN.md) for design context. Look-and-feel knobs and a browser checklist live in [the tuning guide](docs/TUNING.md). Balance and gameplay remain open for feedback.
 
 ## Checks
 
-`pnpm test` runs 33 focused Node tests using the existing esbuild dependency. This includes real Rapier simulation, animated spider grounding, wave growth/reset/pause, varied non-overlapping spawn lanes, outer-lane framing, quick-kill health and reaction windows, per-bug pace and quick-kill rewards, lighting/haze layering, bounded effect pools and popup disposal, camera-shake decay, timed streak rewards at 30/60/120 Hz, streak interruption and cooldown, actual World-to-bowl reward integration, low-pressure shots, top-10-only score recording, and result validation. No new testing framework.
+`pnpm test` runs focused Node tests using the existing esbuild dependency. Coverage includes real Rapier simulation, wave growth and reset, pause, spawn lanes and framing, quick-kill rewards, lighting and effects, streak rewards, low-pressure shots, and round results.
 
 Earlier headless Chrome checks covered desktop/mobile layouts and the round lifecycle. Reaction/streak changes are covered by Node and physics tests; browser visual checks, actual phone/touch-device testing, and gameplay tuning remain separate.
 

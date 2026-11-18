@@ -105,4 +105,4 @@ Balance lives in `src/lib/Game/config.ts`. The values set in the pacing pass:
 - `BOWL_STREAK_SECONDS`
 - `COMBO_STEP` and `MAX_MULTIPLIER` (kill chain: +0.25× per kill, 3× cap; an escape resets it)
 
-Changing them changes scores, so bump `RULES_VERSION` afterwards.
+Changing these values can change scores and round duration.

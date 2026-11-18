@@ -4,57 +4,29 @@
 	import { gameStateStore } from '$lib/Utils/Store';
 	import {
 		DEFAULT_SETTINGS,
-		RULES_VERSION,
 		BOWL_STREAK_SECONDS,
 		WAVE_BREAK,
 		QUICK_KILL_WINDOW
 	} from '$lib/Game/config';
 	import { loadSettings, saveSettings } from '$lib/Game/settings';
 	import { assetsToLoad } from '$lib/Utils/Assets';
-	import {
-		loadScores,
-		saveScore,
-		rankScores,
-		playerName,
-		validName,
-		resultTitle,
-		shareScore,
-		type ScoreEntry
-	} from '$lib/Game/leaderboard';
 	import Hud from '$lib/UI/Hud.svelte';
-	import Scoreboard from '$lib/UI/Scoreboard.svelte';
 
 	let canvas: HTMLCanvasElement;
 	let app: App | undefined;
 	let progress = $state(0),
 		ready = $state(false),
 		error = $state('');
-	let panel = $state<'home' | 'party' | 'board' | 'help' | 'settings'>('home');
+	let panel = $state<'home' | 'help' | 'settings'>('home');
 	let settings = $state({ ...DEFAULT_SETTINGS });
-	let scores = $state<ScoreEntry[]>([]);
-	let name = $state('PLAYER'),
-		partyNames = $state('PLAYER 1\nPLAYER 2'),
-		party = $state<string[]>([]),
-		partyIndex = $state(0),
-		partyScores = $state<ScoreEntry[]>([]);
-	let formError = $state(''),
-		storageMessage = $state(''),
-		shareMessage = $state('');
-	let rank = $state(-1);
-	let entry = $state<ScoreEntry | null>(null);
-	let run: { id: string; name: string } | null = null;
-	let completedId = '';
 	let mounted = false;
 	let focusPanel = $state<HTMLElement>();
 	const phase = $derived($gameStateStore.phase);
-	const best = $derived(scores[0]?.score ?? 0);
-	const currentName = $derived(party.length ? party[partyIndex] : name);
-	const lastTurn = $derived(party.length > 0 && partyIndex === party.length - 1);
+	const result = $derived($gameStateStore.result);
 
 	onMount(() => {
 		mounted = true;
 		settings = loadSettings();
-		scores = loadScores();
 		const initialize = async () => {
 			try {
 				app = new App(canvas);
@@ -86,95 +58,14 @@
 	});
 
 	$effect(() => {
-		if (phase === 'results' && run && completedId !== run.id && $gameStateStore.result) {
-			completedId = run.id;
-			entry = {
-				...$gameStateStore.result,
-				id: run.id,
-				name: run.name,
-				timestamp: new Date().toISOString(),
-				rulesVersion: RULES_VERSION
-			};
-			const saved = saveScore(scores, entry);
-			scores = saved.scores;
-			rank = saved.rank;
-			storageMessage = saved.persisted
-				? ''
-				: 'Storage unavailable. Scores stay here until you close this page.';
-			if (party.length) partyScores = [...partyScores, entry];
-		}
-	});
-
-	$effect(() => {
 		if (phase === 'results' || phase === 'paused' || panel !== 'home') {
 			void tick().then(() => focusPanel?.focus({ preventScroll: true }));
 		}
 	});
 
-	function startRound() {
-		shareMessage = '';
-		entry = null;
-		run = { id: crypto.randomUUID(), name: playerName(currentName) };
-		app?.start();
-	}
-
-	function solo() {
-		party = [];
-		partyScores = [];
-		name = playerName(name);
-		startRound();
-	}
-
-	function startParty() {
-		const names = partyNames
-			.split('\n')
-			.map((s) => s.trim())
-			.filter(Boolean);
-		if (names.length < 2 || names.length > 8 || names.some((s) => !validName(s))) {
-			formError =
-				'Enter 2–8 names, one per line. Use 1–12 letters, numbers, spaces, or . _ - per name.';
-			return;
-		}
-		formError = '';
-		party = names;
-		partyIndex = 0;
-		partyScores = [];
-		panel = 'home';
-		startRound();
-	}
-
-	function nextTurn() {
-		partyIndex++;
-		startRound();
-	}
-
 	function mainMenu() {
 		app?.menu();
 		panel = 'home';
-		run = null;
-		entry = null;
-	}
-
-	async function share() {
-		if (!entry) return;
-		try {
-			shareMessage =
-				(await shareScore(entry)) === 'shared'
-					? 'Challenge sent.'
-					: 'Score card downloaded. Send it to your group chat.';
-		} catch (cause) {
-			if (!(cause instanceof Error && cause.name === 'AbortError'))
-				shareMessage = 'Sharing failed. Try copying the game link.';
-		}
-	}
-
-	async function copyLink() {
-		try {
-			await navigator.clipboard.writeText(location.origin);
-			shareMessage = 'Game link copied.';
-		} catch {
-			shareMessage = `Copy this link: ${location.origin}`;
-		}
 	}
 </script>
 
@@ -182,7 +73,7 @@
 	<title>Aim Low - Low aim. High scores.</title>
 	<meta
 		name="description"
-		content="Keep it in the bowl. Blast the bugs. Don’t run dry. A ridiculous, free arcade party game."
+		content="Keep it in the bowl. Blast the bugs. Don’t run dry. A free single-player browser game."
 	/>
 	<meta name="theme-color" content="#101c28" />
 	<link
@@ -250,22 +141,7 @@
 						Keep it in the bowl. Blast the bugs.<br />Don’t run dry. Your dignity is optional.
 					</p>
 
-					<label class="player-field">
-						<span class="eyebrow">YOUR ARCADE NAME</span>
-						<input
-							maxlength="12"
-							bind:value={name}
-							aria-label="Your arcade name"
-							autocomplete="nickname"
-						/>
-					</label>
-
-					<button class="primary play" onclick={solo}>LET IT FLOW <span>↗</span></button>
-					<div class="menu-actions">
-						<button class="secondary" onclick={() => (panel = 'party')}
-							>PARTY PLAY <span>2–8</span></button
-						><button class="secondary" onclick={() => (panel = 'board')}>HIGH SCORES ↗</button>
-					</div>
+					<button class="primary play" onclick={() => app?.start()}>PLAY <span>↗</span></button>
 					<div class="minor-actions">
 						<button class="text-button" onclick={() => (panel = 'help')}>HOW TO PLAY</button><span>
 							/
@@ -289,13 +165,7 @@
 					class="panel comic-panel"
 					bind:this={focusPanel}
 					tabindex="-1"
-					aria-label={panel === 'board'
-						? 'Leaderboard'
-						: panel === 'party'
-							? 'Party setup'
-							: panel === 'settings'
-								? 'Settings'
-								: 'How to play'}
+					aria-label={panel === 'settings' ? 'Settings' : 'How to play'}
 				>
 					<button
 						class="back text-button"
@@ -303,27 +173,7 @@
 							panel = 'home';
 						}}>← BACK TO THE BATHROOM</button
 					>
-					{#if panel === 'party'}
-						<span class="caption">ONE DEVICE. ZERO DIGNITY.</span>
-						<h2>PASS THE<br /><em>PRESSURE.</em></h2>
-						<p>2–8 players. One round each. Highest score gets bragging rights.</p>
-						<label class="field"
-							>PLAYER NAMES <span>ONE PER LINE · 12 CHARACTERS MAX</span><textarea
-								bind:value={partyNames}
-								rows="5"
-								maxlength="103"
-								aria-describedby="party-error"
-							></textarea></label
-						>
-						{#if formError}<p id="party-error" class="error" role="alert">
-								{formError}
-							</p>{/if}<button class="primary full" onclick={startParty}>START THE PARTY ↗</button>
-					{:else if panel === 'board'}
-						<span class="caption">THE WALL OF FAME</span>
-						<h2>HIGH<br /><em>SCORES.</em></h2>
-						<Scoreboard {scores} />
-						<p class="fine-print">Top 10 only. A run that misses the board is not recorded.</p>
-					{:else if panel === 'help'}
+					{#if panel === 'help'}
 						<span class="caption">THE SHORT VERSION</span>
 						<h2>MAKE EVERY<br /><em>DROP COUNT.</em></h2>
 						<ol class="instructions">
@@ -415,13 +265,10 @@
 			</div>
 		{/if}
 	{:else if phase === 'playing' || phase === 'countdown'}
-		<Hud state={$gameStateStore} name={currentName} {best} onpause={() => app?.pause()} />
+		<Hud state={$gameStateStore} onpause={() => app?.pause()} />
 		{#if phase === 'countdown'}<div class="countdown" aria-live="polite">
-				<span class="caption"
-					>{party.length
-						? `TURN ${partyIndex + 1} OF ${party.length} · ${currentName}`
-						: 'GET YOUR AIM TOGETHER'}</span
-				>{#key Math.ceil($gameStateStore.countdown)}<b class="lettering"
+				<span class="caption">GET YOUR AIM TOGETHER</span>
+				{#key Math.ceil($gameStateStore.countdown)}<b class="lettering"
 						>{Math.ceil($gameStateStore.countdown)}</b
 					>{/key}<span>AIM INSIDE. BLAST BUGS. DON’T RUN DRY.</span>
 			</div>{/if}
@@ -445,7 +292,7 @@
 			<span class="caption">THE TANK HAS SPOKEN</span>
 			<h2 class="lettering">OUT OF<br /><em>JUICE.</em></h2>
 		</div>
-	{:else if phase === 'results' && entry}
+	{:else if phase === 'results' && result}
 		<div class="modal-wrap scrim">
 			<section
 				class="panel comic-panel results"
@@ -453,20 +300,16 @@
 				tabindex="-1"
 				aria-label="Round results"
 			>
-				<div class="result-top">
-					<span class="eyebrow">{entry.name} / ROUND COMPLETE</span><span class="stamp"
-						>{scores[0]?.id === entry.id ? 'DEVICE BEST ↗' : resultTitle(entry)}</span
-					>
-				</div>
+				<span class="eyebrow">ROUND COMPLETE</span>
 				<h2>OUT OF JUICE.<br /><em>FULL OF GLORY.</em></h2>
-				<div class="final-score">{entry.score.toLocaleString()}<span>POINTS</span></div>
+				<div class="final-score">{result.score.toLocaleString()}<span>POINTS</span></div>
 				<div class="result-stats">
 					<div>
-						<b>{entry.accuracy === null ? '—' : `${Math.round(entry.accuracy * 100)}%`}</b><span
+						<b>{result.accuracy === null ? '—' : `${Math.round(result.accuracy * 100)}%`}</b><span
 							>ACCURACY</span
 						>
 					</div>
-					<div><b>{entry.kills}</b><span>BUGS BLASTED</span></div>
+					<div><b>{result.kills}</b><span>BUGS BLASTED</span></div>
 					<div>
 						<b
 							>{$gameStateStore.fastestKill === null
@@ -474,40 +317,12 @@
 								: `${$gameStateStore.fastestKill.toFixed(2)}s`}</b
 						><span>FASTEST KILL</span>
 					</div>
-					<div><b>{entry.duration.toFixed(1)}s</b><span>LASTED</span></div>
+					<div><b>{result.duration.toFixed(1)}s</b><span>LASTED</span></div>
 				</div>
-				{#if party.length}<div class="party-standings">
-						<span class="eyebrow"
-							>{lastTurn
-								? `PARTY WINNER: ${rankScores(partyScores)[0]?.name}`
-								: `PARTY STANDINGS · ${partyIndex + 1}/${party.length}`}</span
-						><Scoreboard scores={rankScores(partyScores)} highlight={entry.id} />
-					</div>{/if}
 				<div class="result-actions">
-					{#if party.length && !lastTurn}<button class="primary" onclick={nextTurn}
-							>NEXT: {party[partyIndex + 1]} ↗</button
-						>{:else if lastTurn}<button
-							class="primary"
-							onclick={() => {
-								partyIndex = 0;
-								partyScores = [];
-								startRound();
-							}}>REMATCH ↗</button
-						>{:else}<button class="primary" onclick={startRound}>ONE MORE ROUND ↗</button
-						>{/if}<button class="secondary" onclick={() => void share()}>SHARE SCORE</button>
+					<button class="primary" onclick={() => app?.start()}>ONE MORE ROUND ↗</button>
+					<button class="secondary" onclick={mainMenu}>MENU</button>
 				</div>
-				<div class="minor-actions">
-					<button class="text-button" onclick={() => void copyLink()}>COPY LINK</button><span
-						>/</span
-					><button class="text-button" onclick={mainMenu}>MENU</button>
-				</div>
-				<p class="fine-print" role="status">
-					{shareMessage ||
-						(rank < 0
-							? `Missed the top 10. Beat ${scores.at(-1)?.score.toLocaleString()} to get on the board.`
-							: `#${rank + 1} on the high scores.`)}
-					{storageMessage}
-				</p>
 			</section>
 		</div>
 	{/if}
@@ -629,21 +444,6 @@
 		line-height: 1.5;
 		margin: 0 0 0.9rem;
 	}
-	.player-field {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-		margin: 0 0 1rem;
-	}
-	.player-field .eyebrow {
-		font-size: 0.72rem;
-		white-space: nowrap;
-	}
-	.player-field input {
-		padding: 0.45rem 0.65rem;
-		font: 700 0.85rem var(--mono);
-		min-width: 0;
-	}
 	.play {
 		width: 100%;
 		display: flex;
@@ -655,22 +455,6 @@
 	.play > span {
 		font-size: 1.6rem;
 		line-height: 1;
-	}
-	.menu-actions {
-		display: flex;
-		gap: 0.75rem;
-		margin-top: 1rem;
-	}
-	.menu-actions button {
-		flex: 1;
-		padding: 0.6rem 0.4rem;
-		font-size: 1rem;
-		white-space: nowrap;
-	}
-	.menu-actions span {
-		color: var(--muted);
-		margin-left: 0.3rem;
-		font: 700 0.6rem var(--mono);
 	}
 	.minor-actions {
 		display: grid;
@@ -807,30 +591,6 @@
 		width: 100%;
 		margin-top: 1rem;
 	}
-	.field {
-		display: block;
-		font: 700 0.65rem var(--mono);
-		margin-top: 1.5rem;
-	}
-	.field span {
-		display: block;
-		color: var(--muted);
-		margin: 0.5rem 0;
-		font-size: 0.55rem;
-	}
-	textarea {
-		resize: vertical;
-		font: 0.9rem/1.8 var(--mono);
-	}
-	.panel .error {
-		color: #c8102e;
-		font-weight: 700;
-	}
-	.panel .fine-print {
-		font: 0.62rem/1.6 var(--mono);
-		color: var(--muted);
-		margin-bottom: 0;
-	}
 	.instructions {
 		list-style: none;
 		padding: 0;
@@ -944,26 +704,6 @@
 	.results {
 		--shadow: var(--lime);
 	}
-	.result-top {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 1rem;
-	}
-	.result-top .eyebrow {
-		font-size: 0.55rem;
-	}
-	/* Rubber stamp on the result card. */
-	.stamp {
-		color: #c2185b;
-		border: 3px solid currentColor;
-		border-radius: 4px;
-		padding: 0.15rem 0.6rem;
-		font: 1.05rem var(--display);
-		letter-spacing: 0.06em;
-		text-align: center;
-		rotate: 6deg;
-	}
 	.results h2 {
 		font-size: clamp(2rem, 4vw, 2.7rem);
 		margin: 1.2rem 0 0.4rem;
@@ -1009,9 +749,6 @@
 	.result-actions button {
 		flex: 1;
 		padding: 0.75rem 0.6rem;
-	}
-	.party-standings {
-		margin-top: 1.5rem;
 	}
 	.loading-screen {
 		position: absolute;
@@ -1138,12 +875,6 @@
 			line-height: 1.4;
 			margin-bottom: 0.6rem;
 		}
-		.player-field {
-			margin-bottom: 0.7rem;
-		}
-		.menu-actions {
-			margin-top: 0.7rem;
-		}
 		.minor-actions button {
 			min-height: 34px;
 		}
@@ -1183,10 +914,6 @@
 			font-size: clamp(3.5rem, 16vh, 6rem);
 			margin: 0;
 		}
-		.player-field .eyebrow {
-			font-size: 0.6rem;
-			letter-spacing: 0.06em;
-		}
 		h1 svg {
 			display: none;
 		}
@@ -1195,9 +922,6 @@
 			grid-row: 1;
 			margin: 0;
 			padding: 0.8rem 1rem 0.3rem;
-		}
-		.menu-actions button {
-			font-size: 0.85rem;
 		}
 		.intro,
 		.tagline,
@@ -1215,14 +939,8 @@
 			font-size: clamp(3.5rem, 13vh, 5rem);
 			margin: 0.3rem 0;
 		}
-		.player-field {
-			margin: 0.3rem 0;
-		}
 		.play {
 			min-height: 48px;
-		}
-		.menu-actions {
-			margin-top: 0.35rem;
 		}
 	}
 </style>

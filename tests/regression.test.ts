@@ -11,7 +11,6 @@ import Session from '../src/lib/Game/Session';
 import {
 	jetProfile,
 	STEP,
-	RULES_VERSION,
 	BUGS,
 	KILL_PRESSURE_GAIN,
 	DRINK_PRESSURE_GAIN,
@@ -35,20 +34,11 @@ import {
 	PARTICLE_LIFE,
 	BUG_SPEEDS,
 	QUICK_KILL_WINDOW,
-	MAX_KILL_REWARD,
 	killReward,
 	multiplier,
 	MAX_MULTIPLIER,
 	type DrinkKind
 } from '../src/lib/Game/config';
-import {
-	validEntry,
-	validResult,
-	rankScores,
-	loadScores,
-	saveScore,
-	type ScoreEntry
-} from '../src/lib/Game/leaderboard';
 import EnemyManager from '../src/lib/World/EnemyManager';
 import Environment from '../src/lib/World/Environment';
 import World from '../src/lib/World/World';
@@ -341,7 +331,6 @@ test('kill recovery caps at 100 and never revives an ended or paused round', () 
 	session.tick(80);
 	const result = session.state.result;
 	assert.ok(result && result.duration > 80.1);
-	assert.ok(validResult(result), 'refill-extended runs remain eligible for scores');
 	session.kill('wasp');
 	assert.equal(session.state.pressure, 0);
 	assert.equal(session.state.result, result);
@@ -1066,7 +1055,6 @@ test('bug pace varies: fast bugs move sooner, escape sooner, glow, and quick kil
 		assert.equal(killReward('wasp'), BUGS.wasp.reward, 'slow kills pay the base reward');
 		assert.equal(killReward('wasp', 1, 0), BUGS.wasp.reward * 2, 'instant kills pay double');
 		assert.ok(killReward('wasp', fast, 1) > killReward('wasp', 1, 1), 'fast bugs pay more');
-		assert.equal(MAX_KILL_REWARD, Math.round(BUGS.wasp.reward * fast * 2));
 		assert.equal(waveProfile(1).fastChance, 0, 'wave 1 teaches the base pace');
 		for (let wave = 2; wave <= 30; wave++) {
 			assert.ok(waveProfile(wave).fastChance >= waveProfile(wave - 1).fastChance);
@@ -1593,95 +1581,6 @@ test('all movement patterns stay framed, face correctly, and remain reachable by
 		physics.dispose();
 		disposeResources(assets.map((asset) => asset.scene));
 	}
-});
-
-test('leaderboard validates untrusted results, sorts, deduplicates, and survives broken storage', (t) => {
-	const entry: ScoreEntry = {
-		id: 'one',
-		name: 'PLAYER',
-		score: 200,
-		accuracy: 0.9,
-		kills: 1,
-		missed: 0,
-		duration: 10,
-		timestamp: '2026-01-01T00:00:00Z',
-		rulesVersion: RULES_VERSION
-	};
-	assert.equal(validEntry(entry), true);
-	for (const patch of [
-		{ score: NaN },
-		{ score: -1 },
-		{ score: 999999 },
-		{ duration: Infinity },
-		{ duration: NaN },
-		{ duration: 0 },
-		{ score: Number.MAX_SAFE_INTEGER + 1 },
-		{ kills: 500 },
-		{ accuracy: 2 }
-	])
-		assert.equal(validResult({ ...entry, ...patch }), false);
-	assert.equal(validEntry({ ...entry, duration: 180, kills: 20 }), true);
-	assert.equal(
-		validResult({ ...entry, duration: 100, kills: Math.ceil(100 / MIN_SPAWN_INTERVAL) }),
-		true
-	);
-	assert.equal(
-		validResult({ ...entry, duration: 100, kills: Math.ceil(100 / MIN_SPAWN_INTERVAL) + 1 }),
-		false
-	);
-	assert.equal(validEntry({ ...entry, name: '<script>' }), false);
-	assert.equal(validEntry({ ...entry, rulesVersion: 'old' }), false);
-	assert.equal(
-		validResult({ ...entry, score: 1500, duration: 10, kills: 0, missed: 0 }),
-		true,
-		'boosted flow can legitimately score 150 points per second'
-	);
-	assert.equal(validResult({ ...entry, score: 1501, duration: 10, kills: 0, missed: 0 }), false);
-	assert.equal(rankScores([entry, { ...entry, id: 'two', accuracy: 1 }])[0].id, 'two');
-	mockGlobal(t, 'localStorage', {
-		getItem: () => '{oops',
-		setItem: () => {
-			throw new Error('full');
-		}
-	});
-	assert.deepEqual(loadScores(), []);
-	const saved = saveScore([entry], { ...entry, score: 250 });
-	assert.equal(saved.persisted, false);
-	assert.equal(saved.scores.length, 1);
-	assert.equal(saved.scores[0].score, 250);
-	assert.equal(saved.rank, 0);
-});
-
-test('only top-10 runs are recorded; a run that misses the board never touches storage', (t) => {
-	const writes: string[] = [];
-	mockGlobal(t, 'localStorage', {
-		getItem: () => null,
-		setItem: (_: string, v: string) => writes.push(v)
-	});
-	const run = (id: string, score: number): ScoreEntry => ({
-		id,
-		name: 'PLAYER',
-		score,
-		accuracy: 0.5,
-		kills: 0,
-		missed: 0,
-		duration: 60,
-		timestamp: '2026-01-01T00:00:00Z',
-		rulesVersion: RULES_VERSION
-	});
-	let scores: ScoreEntry[] = [];
-	for (let i = 1; i <= 10; i++) scores = saveScore(scores, run(`r${i}`, i * 100)).scores;
-	assert.equal(scores.length, 10);
-	assert.equal(writes.length, 10);
-	const miss = saveScore(scores, run('low', 50));
-	assert.equal(miss.rank, -1);
-	assert.equal(miss.scores, scores, 'board unchanged');
-	assert.equal(writes.length, 10, 'missed run is not written');
-	const hit = saveScore(scores, run('high', 550));
-	assert.equal(hit.rank, 5);
-	assert.equal(hit.scores.length, 10);
-	assert.ok(!hit.scores.some((s) => s.id === 'r1'), 'lowest score drops off');
-	assert.equal(writes.length, 11);
 });
 
 test('assets load together and report completion without global readiness subscriptions', async (t) => {

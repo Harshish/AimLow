@@ -9,6 +9,9 @@ node_modules
 /build
 graphify-out/
 
+# Legacy local database
+/.data/
+
 # OS
 .DS_Store
 Thumbs.db

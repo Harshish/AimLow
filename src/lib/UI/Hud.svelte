@@ -1,20 +1,14 @@
 <script lang="ts">
 	import type { GameState } from '$lib/Game/Session';
 	import { DRINKS, BOWL_STREAK_SECONDS, multiplier } from '$lib/Game/config';
-	let {
-		state,
-		name,
-		best,
-		onpause
-	}: { state: GameState; name: string; best: number; onpause: () => void } = $props();
+	let { state, onpause }: { state: GameState; onpause: () => void } = $props();
 </script>
 
 <div class="hud">
 	<div class="score-block">
 		<div class="score-card">
-			<span class="eyebrow">{name} / SCORE</span><strong
-				>{Math.floor(state.score).toLocaleString().padStart(4, '0')}</strong
-			><small>BEST {best.toLocaleString()}</small>
+			<span class="eyebrow">SCORE</span>
+			<strong>{Math.floor(state.score).toLocaleString().padStart(4, '0')}</strong>
 		</div>
 		{#if state.combo > 0}
 			{#key state.combo}<span class="combo">×{multiplier(state.combo)} COMBO</span>{/key}
@@ -128,11 +122,6 @@
 	.score-card strong {
 		font: 400 clamp(2.4rem, 5vw, 3.8rem) / 0.95 var(--display);
 		letter-spacing: 0.04em;
-	}
-	.score-card small {
-		font: 700 0.6rem var(--mono);
-		letter-spacing: 0.1em;
-		color: #5c4a00;
 	}
 	.combo {
 		padding: 0.2rem 0.55rem;
