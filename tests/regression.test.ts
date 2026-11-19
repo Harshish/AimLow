@@ -1629,7 +1629,7 @@ test('asset errors identify the failing URL instead of leaving loading stuck', a
 	try {
 		await assert.rejects(
 			loader.load(() => {}),
-			/Failed to load \/models\/urinal.glb/
+			/Failed to load models\/urinal.glb/
 		);
 	} finally {
 		loader.dispose(new THREE.Scene());

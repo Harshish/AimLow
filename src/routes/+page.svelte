@@ -78,7 +78,7 @@
 	<meta name="theme-color" content="#101c28" />
 	<link
 		rel="preload"
-		href="/fonts/bangers-latin.woff2"
+		href="fonts/bangers-latin.woff2"
 		as="font"
 		type="font/woff2"
 		crossorigin="anonymous"

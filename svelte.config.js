@@ -7,7 +7,9 @@ const config = {
 		runes: ({ filename }) => (filename.split(/[/\\]/).includes('node_modules') ? undefined : true)
 	},
 	kit: {
-		adapter: adapter()
+		adapter: adapter(),
+		// GitHub Pages project sites live under /<repo>; CI sets BASE_PATH.
+		paths: { base: process.env.BASE_PATH ?? '' }
 	}
 };
 

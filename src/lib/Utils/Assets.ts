@@ -11,10 +11,10 @@ export type LoadedAssets = {
 };
 
 export const assetsToLoad = [
-	{ path: '/models/urinal.glb', id: 'urinal', type: 'model' },
-	{ path: '/models/wasp.glb', id: 'wasp', type: 'model' },
-	{ path: '/models/spider.glb', id: 'spider', type: 'model' },
-	{ path: '/textures/t_floor.png', id: 'floor', type: 'texture' },
-	{ path: '/textures/t_bricks.png', id: 'wall', type: 'texture' },
-	{ path: '/textures/t_graffiti.png', id: 'graffiti', type: 'texture' }
+	{ path: 'models/urinal.glb', id: 'urinal', type: 'model' },
+	{ path: 'models/wasp.glb', id: 'wasp', type: 'model' },
+	{ path: 'models/spider.glb', id: 'spider', type: 'model' },
+	{ path: 'textures/t_floor.png', id: 'floor', type: 'texture' },
+	{ path: 'textures/t_bricks.png', id: 'wall', type: 'texture' },
+	{ path: 'textures/t_graffiti.png', id: 'graffiti', type: 'texture' }
 ] as const;
